@@ -1,0 +1,362 @@
+﻿{
+    "name":  "Lead prospecting pipeline",
+    "nodes":  [
+                  {
+                      "parameters":  {
+
+                                     },
+                      "id":  "96d6c264-3176-425c-bcf8-c342f0bf1f89",
+                      "name":  "Iniciar prospeccao",
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -720,
+                                       368
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  [
+                                                                                 {
+                                                                                     "id":  "google-api-key",
+                                                                                     "name":  "google_places_api_key",
+                                                                                     "value":  "COLE_SUA_CHAVE_GOOGLE_PLACES_AQUI",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "segmentos",
+                                                                                     "name":  "segmentos",
+                                                                                     "value":  "clinica odontologica, escola de idiomas, academia, imobiliaria, escritorio de contabilidade, loja de moveis planejados, estetica automotiva, clinica de estetica, restaurante, oficina mecanica",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "cidades",
+                                                                                     "name":  "cidades",
+                                                                                     "value":  "Sorocaba, Votorantim, Itu, Salto, Porto Feliz, Aracoiaba da Serra, Ipero, Boituva, Tatui, Sao Roque",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "limite",
+                                                                                     "name":  "limite_por_busca",
+                                                                                     "value":  10,
+                                                                                     "type":  "number"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "observacao",
+                                                                                     "name":  "observacao",
+                                                                                     "value":  "Edite segmentos e cidades antes de executar. Use uma chave valida do Google Places API.",
+                                                                                     "type":  "string"
+                                                                                 }
+                                                                             ]
+                                                         },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "94d8df3e-51bb-42b2-99dc-8eaf7a3de3f6",
+                      "name":  "Configuracao da prospeccao",
+                      "type":  "n8n-nodes-base.set",
+                      "typeVersion":  3.4,
+                      "position":  [
+                                       -480,
+                                       368
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const segmentos = $json.segmentos.split(\u0027,\u0027).map(s =\u003e s.trim()).filter(Boolean);\nconst cidades = $json.cidades.split(\u0027,\u0027).map(c =\u003e c.trim()).filter(Boolean);\nconst limite = Number($json.limite_por_busca || 10);\nconst apiKey = $json.google_places_api_key;\n\nconst buscas = [];\nfor (const cidade of cidades) {\n  for (const segmento of segmentos) {\n    buscas.push({\n      segmento,\n      cidade,\n      termo_busca: `${segmento} em ${cidade} SP`,\n      limite_por_busca: limite,\n      google_places_api_key: apiKey\n    });\n  }\n}\n\nreturn buscas.map(busca =\u003e ({ json: busca }));"
+                                     },
+                      "id":  "75a9fe7d-cf8d-4fbe-ac61-5c1f943595f2",
+                      "name":  "Gerar buscas por cidade e segmento",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -240,
+                                       368
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "https://maps.googleapis.com/maps/api/place/textsearch/json",
+                                         "sendQuery":  true,
+                                         "queryParameters":  {
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "query",
+                                                                                        "value":  "={{ $json.termo_busca }}"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "key",
+                                                                                        "value":  "={{ $json.google_places_api_key }}"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "language",
+                                                                                        "value":  "pt-BR"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "region",
+                                                                                        "value":  "br"
+                                                                                    }
+                                                                                ]
+                                                             },
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      }
+                                                     }
+                                     },
+                      "id":  "1604cf34-f314-414c-80ac-b350e048d0fd",
+                      "name":  "Buscar empresas no Google Places",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       32,
+                                       368
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const origem = $(\u0027Gerar buscas por cidade e segmento\u0027).item.json;\nconst resultados = $json.results || [];\nconst limite = Number(origem.limite_por_busca || 10);\n\nreturn resultados.slice(0, limite).map(place =\u003e {\n  const rating = place.rating || 0;\n  const avaliacoes = place.user_ratings_total || 0;\n  const aberto = place.opening_hours?.open_now;\n  const endereco = place.formatted_address || \u0027\u0027;\n\n  let pontuacao = 0;\n  if (rating \u003e= 4.4) pontuacao += 25;\n  if (avaliacoes \u003e= 50) pontuacao += 25;\n  if (place.business_status === \u0027OPERATIONAL\u0027) pontuacao += 20;\n  if (endereco.toLowerCase().includes(origem.cidade.toLowerCase())) pontuacao += 15;\n  if (place.types?.length) pontuacao += 15;\n\n  return {\n    json: {\n      nome_empresa: place.name || \u0027\u0027,\n      segmento_pesquisado: origem.segmento,\n      cidade_pesquisada: origem.cidade,\n      endereco,\n      rating,\n      total_avaliacoes: avaliacoes,\n      status_google: place.business_status || \u0027\u0027,\n      aberto_agora: aberto === undefined ? \u0027nao_informado\u0027 : aberto,\n      place_id: place.place_id || \u0027\u0027,\n      tipos_google: (place.types || []).join(\u0027, \u0027),\n      link_google_maps: place.place_id ? `https://www.google.com/maps/place/?q=place_id:${place.place_id}` : \u0027\u0027,\n      pontuacao_lead: pontuacao,\n      prioridade: pontuacao \u003e= 70 ? \u0027alta\u0027 : pontuacao \u003e= 45 ? \u0027media\u0027 : \u0027baixa\u0027,\n      status_prospeccao: \u0027novo\u0027,\n      sugestao_abordagem: `Olá, tudo bem? Vi a ${place.name || \u0027empresa\u0027} em ${origem.cidade} e queria entender se voces ja usam automacoes para captar e atender clientes.`\n    }\n  };\n});"
+                                     },
+                      "id":  "67ac1aa9-9286-46d5-aaf2-e1710210229b",
+                      "name":  "Normalizar e pontuar leads",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       288,
+                                       368
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  2
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "tem-place-id",
+                                                                                   "leftValue":  "={{ $json.place_id }}",
+                                                                                   "rightValue":  "",
+                                                                                   "operator":  {
+                                                                                                    "type":  "string",
+                                                                                                    "operation":  "notEmpty",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "7fcb226f-cb75-469e-9d37-fe2603c712b3",
+                      "name":  "Filtrar leads validos",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       544,
+                                       368
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const seen = new Set();\nconst leads = [];\n\nfor (const item of $input.all()) {\n  const lead = item.json;\n  const chave = lead.place_id || `${lead.nome_empresa}-${lead.endereco}`.toLowerCase();\n  if (seen.has(chave)) continue;\n  seen.add(chave);\n  leads.push({ json: lead });\n}\n\nleads.sort((a, b) =\u003e Number(b.json.pontuacao_lead || 0) - Number(a.json.pontuacao_lead || 0));\nreturn leads;"
+                                     },
+                      "id":  "41cf219d-56b1-4ff1-9322-58ff0875da35",
+                      "name":  "Remover duplicados e ordenar",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       832,
+                                       288
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  [
+                                                                                 {
+                                                                                     "id":  "data-prospeccao",
+                                                                                     "name":  "data_prospeccao",
+                                                                                     "value":  "={{ $now.toFormat(\u0027yyyy-MM-dd HH:mm\u0027) }}",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "canal-sugerido",
+                                                                                     "name":  "canal_sugerido",
+                                                                                     "value":  "Google Maps / telefone / WhatsApp / Instagram",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "proximo-passo",
+                                                                                     "name":  "proximo_passo",
+                                                                                     "value":  "={{ $json.prioridade === \u0027alta\u0027 ? \u0027contatar hoje\u0027 : $json.prioridade === \u0027media\u0027 ? \u0027contatar nesta semana\u0027 : \u0027nutrir ou revisar manualmente\u0027 }}",
+                                                                                     "type":  "string"
+                                                                                 }
+                                                                             ]
+                                                         },
+                                         "includeOtherFields":  true,
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "450bd126-4501-41d4-928d-21ec4b70463a",
+                      "name":  "Preparar para CRM ou planilha",
+                      "type":  "n8n-nodes-base.set",
+                      "typeVersion":  3.4,
+                      "position":  [
+                                       1088,
+                                       288
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "toFile",
+                                         "fileFormat":  "csv",
+                                         "options":  {
+                                                         "fileName":  "leads-sorocaba-regiao.csv"
+                                                     }
+                                     },
+                      "id":  "6b63ef7a-26ce-41b5-92ad-84b303b05411",
+                      "name":  "Gerar CSV de leads",
+                      "type":  "n8n-nodes-base.spreadsheetFile",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1344,
+                                       288
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# Prospeccao local\n\nEdite segmentos, cidades e chave do Google Places no no Configuracao da prospeccao. Depois execute manualmente.",
+                                         "height":  180,
+                                         "width":  380
+                                     },
+                      "id":  "6c3ad64f-a4f9-4005-8d58-4a851e36175b",
+                      "name":  "Nota: configuracao",
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -528,
+                                       64
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "Fluxo:\n\n1. Gera combinacoes de nicho + cidade\n2. Consulta Google Places\n3. Normaliza empresas encontradas\n4. Pontua prioridade\n5. Remove duplicados\n6. Gera CSV para prospeccao",
+                                         "height":  260,
+                                         "width":  360
+                                     },
+                      "id":  "af2dd655-e813-443d-a268-fbb085a036f4",
+                      "name":  "Nota: fluxo",
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       0,
+                                       0
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "Iniciar prospeccao":  {
+                                                   "main":  [
+                                                                [
+                                                                    {
+                                                                        "node":  "Configuracao da prospeccao",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                                ]
+                                                            ]
+                                               },
+                        "Configuracao da prospeccao":  {
+                                                           "main":  [
+                                                                        [
+                                                                            {
+                                                                                "node":  "Gerar buscas por cidade e segmento",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
+                                                                    ]
+                                                       },
+                        "Gerar buscas por cidade e segmento":  {
+                                                                   "main":  [
+                                                                                [
+                                                                                    {
+                                                                                        "node":  "Buscar empresas no Google Places",
+                                                                                        "type":  "main",
+                                                                                        "index":  0
+                                                                                    }
+                                                                                ]
+                                                                            ]
+                                                               },
+                        "Buscar empresas no Google Places":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "Normalizar e pontuar leads",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                        "Normalizar e pontuar leads":  {
+                                                           "main":  [
+                                                                        [
+                                                                            {
+                                                                                "node":  "Filtrar leads validos",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
+                                                                    ]
+                                                       },
+                        "Filtrar leads validos":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "Remover duplicados e ordenar",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "Remover duplicados e ordenar":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "Preparar para CRM ou planilha",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                        "Preparar para CRM ou planilha":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "Gerar CSV de leads",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate"
+                 }
+}

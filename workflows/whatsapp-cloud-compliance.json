@@ -1,0 +1,1311 @@
+﻿{
+    "name":  "WhatsApp Cloud API compliance",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "content":  "# WA Cloud Completo - Compliance Meta\n\nWorkflow único reunindo:\n- Setup do banco\n- Dispatcher de campanhas\n- Webhook de respostas e opt-out\n- Webhook de status/métricas\n\nMantenha este workflow DESATIVADO até configurar Postgres e Meta Cloud API oficial.\n\nAtive apenas este workflow unificado, ou apenas os workflows separados, nunca os dois ao mesmo tempo, para evitar conflito nos webhooks.",
+                                         "height":  380,
+                                         "width":  760,
+                                         "color":  5
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -1080,
+                                       -1380
+                                   ],
+                      "id":  "26fe622b-9a1d-4b2c-9301-43dfd5460687",
+                      "name":  "README GERAL - WA Cloud Completo"
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# SETUP\n\n# Setup Banco WA Cloud\n\nExecute manualmente uma vez após conectar a credencial Postgres correta.\n\nNão envia mensagens. Apenas cria a estrutura de tabelas para opt-in, opt-out, campanhas, templates, disparos, respostas, webhooks, métricas e logs.",
+                                         "height":  300,
+                                         "width":  620,
+                                         "color":  5
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -680,
+                                       -1300
+                                   ],
+                      "id":  "bf26df9d-9adb-4a65-8a2e-6cf0a550b630",
+                      "name":  "SETUP - README - Setup Banco"
+                  },
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -680,
+                                       -900
+                                   ],
+                      "id":  "cc69711a-e22d-41ab-8d5b-a4fe8a1f80f9",
+                      "name":  "01 - Trigger Manual Setup"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "create extension if not exists pgcrypto;\n\ncreate table if not exists contatos (\n  id uuid primary key default gen_random_uuid(),\n  telefone_e164 text unique not null,\n  nome text,\n  status text default \u0027active\u0027,\n  last_inbound_at timestamptz,\n  created_at timestamptz default now()\n);\n\ncreate table if not exists opt_ins (\n  id uuid primary key default gen_random_uuid(),\n  contato_id uuid references contatos(id),\n  telefone_e164 text not null,\n  origem text not null,\n  campanha_origem text,\n  consentimento_texto text not null,\n  ip text,\n  user_agent text,\n  opt_in_at timestamptz not null default now(),\n  valid boolean default true\n);\n\ncreate table if not exists opt_outs (\n  id uuid primary key default gen_random_uuid(),\n  contato_id uuid references contatos(id),\n  telefone_e164 text not null,\n  palavra text,\n  origem text default \u0027whatsapp\u0027,\n  opt_out_at timestamptz default now()\n);\n\ncreate table if not exists templates (\n  id uuid primary key default gen_random_uuid(),\n  nome_meta text not null,\n  idioma text default \u0027pt_BR\u0027,\n  categoria text,\n  status text default \u0027approved\u0027,\n  body_preview text\n);\n\ncreate table if not exists campanhas (\n  id uuid primary key default gen_random_uuid(),\n  nome text not null,\n  status text default \u0027draft\u0027,\n  template_id uuid references templates(id),\n  start_at timestamptz,\n  end_at timestamptz,\n  allowed_start_hour int default 9,\n  allowed_end_hour int default 18,\n  daily_limit int default 50,\n  hourly_limit int default 10,\n  created_at timestamptz default now()\n);\n\ncreate table if not exists disparos (\n  id uuid primary key default gen_random_uuid(),\n  campanha_id uuid references campanhas(id),\n  contato_id uuid references contatos(id),\n  template_id uuid references templates(id),\n  telefone_e164 text not null,\n  wamid text,\n  status text default \u0027queued\u0027,\n  payload jsonb,\n  erro jsonb,\n  sent_at timestamptz, delivered_at timestamptz, read_at timestamptz, failed_at timestamptz,\n  created_at timestamptz default now(),\n  unique(campanha_id, contato_id, template_id)\n);\n\ncreate table if not exists respostas (\n  id uuid primary key default gen_random_uuid(),\n  contato_id uuid references contatos(id),\n  telefone_e164 text,\n  wamid text, texto text, payload jsonb,\n  received_at timestamptz default now()\n);\n\ncreate table if not exists eventos_webhook (\n  id uuid primary key default gen_random_uuid(),\n  tipo text, wamid text, payload jsonb,\n  received_at timestamptz default now()\n);\n\ncreate table if not exists metricas_campanha (\n  campanha_id uuid primary key references campanhas(id),\n  enviados int default 0, entregues int default 0, lidos int default 0, respostas int default 0, falhas int default 0, opt_outs int default 0,\n  taxa_entrega numeric, taxa_leitura numeric, taxa_resposta numeric, taxa_falha numeric, taxa_opt_out numeric,\n  atualizado_em timestamptz default now()\n);\n\ncreate table if not exists logs_erros (\n  id uuid primary key default gen_random_uuid(),\n  contexto text, erro jsonb, created_at timestamptz default now()\n);\n\ncreate unique index if not exists opt_outs_telefone_unique on opt_outs (telefone_e164);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       -380,
+                                       -900
+                                   ],
+                      "id":  "c57cf191-7bf1-45ee-a568-704942f49848",
+                      "name":  "02 - Criar Tabelas Compliance"
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  [
+                                                                                 {
+                                                                                     "id":  "afb6e6e9-8993-4e5c-a87a-57b7b1b2b8b9",
+                                                                                     "name":  "status",
+                                                                                     "value":  "Schema de compliance criado/validado. Conecte credenciais e mantenha workflows desativados até testes internos.",
+                                                                                     "type":  "string"
+                                                                                 }
+                                                                             ]
+                                                         },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.set",
+                      "typeVersion":  3.4,
+                      "position":  [
+                                       -80,
+                                       -900
+                                   ],
+                      "id":  "4a2c421d-ad21-4356-9d6b-515d6c6fccbb",
+                      "name":  "03 - Resultado Setup"
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# DISPATCHER\n\n# WA Cloud - Dispatcher Compliance\n\nFluxo seguro para campanhas via WhatsApp Business Cloud API oficial.\n\nAntes de ativar:\n1. Configurar credencial Postgres nos nodes SQL.\n2. Configurar token oficial Meta no HTTP Request.\n3. Usar somente templates aprovados.\n4. Inserir apenas contatos com opt-in comprovado.\n5. Testar com contatos internos.\n\nEste workflow nasce desativado para evitar disparos acidentais.",
+                                         "height":  420,
+                                         "width":  720,
+                                         "color":  5
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -900,
+                                       -500
+                                   ],
+                      "id":  "01be4568-870e-4ea4-ba57-e8b6ef0fb1e4",
+                      "name":  "DISPATCHER - README - Compliance WA Cloud"
+                  },
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -900,
+                                       80
+                                   ],
+                      "id":  "3d991f95-15ac-4716-a91b-c1b1c34a1b4d",
+                      "name":  "01 - Trigger Manual - Teste Seguro"
+                  },
+                  {
+                      "parameters":  {
+                                         "rule":  {
+                                                      "interval":  [
+                                                                       {
+                                                                           "field":  "minutes",
+                                                                           "minutesInterval":  15
+                                                                       }
+                                                                   ]
+                                                  }
+                                     },
+                      "type":  "n8n-nodes-base.scheduleTrigger",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       -900,
+                                       260
+                                   ],
+                      "id":  "cd3c56f8-9058-4266-8cbf-e891587cf10a",
+                      "name":  "02 - Trigger Agendado - Horário Comercial"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "select * from campanhas where status = \u0027active\u0027 and now() between coalesce(start_at, now() - interval \u00271 day\u0027) and coalesce(end_at, now() + interval \u00271 day\u0027) order by created_at asc limit 5;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       -560,
+                                       170
+                                   ],
+                      "id":  "20312e9d-2da4-4334-8cd4-009a832ddf90",
+                      "name":  "03 - Buscar Campanhas Ativas"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const hour = Number($now.setZone(\u0027America/Sao_Paulo\u0027).toFormat(\u0027H\u0027));\nreturn items.map(item =\u003e {\n  const c = item.json;\n  const start = Number(c.allowed_start_hour ?? 9);\n  const end = Number(c.allowed_end_hour ?? 18);\n  const inBusinessHours = hour \u003e= start \u0026\u0026 hour \u003c end;\n  return { json: { ...c, inBusinessHours, blockReason: inBusinessHours ? null : \u0027fora_horario_comercial\u0027 } };\n});"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -260,
+                                       170
+                                   ],
+                      "id":  "da7e7fe5-07e9-4cc6-80e7-c29951b1ede2",
+                      "name":  "04 - Guardrail Campanha e Horário"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "6f259e76-f9d7-4708-8141-3c17394b33cc",
+                                                                                   "leftValue":  "={{ $json.inBusinessHours }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       20,
+                                       170
+                                   ],
+                      "id":  "dd371179-d9d8-4b53-a509-23387287cda5",
+                      "name":  "05 - Pode Operar Agora?"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "select c.*, oi.opt_in_at, oi.origem as opt_in_origem, oi.campanha_origem, oi.consentimento_texto\nfrom contatos c\njoin opt_ins oi on oi.contato_id = c.id and oi.valid = true\nwhere c.status = \u0027active\u0027\nand not exists (select 1 from opt_outs oo where oo.contato_id = c.id)\nand not exists (select 1 from disparos d where d.campanha_id = \u0027{{ $json.id }}\u0027 and d.contato_id = c.id)\norder by oi.opt_in_at asc\nlimit 1;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       320,
+                                       60
+                                   ],
+                      "id":  "7c855993-c5fc-4e0c-8e8c-b34c7ed9c8e6",
+                      "name":  "06 - Buscar Contatos com Opt-in Válido"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const campanha = $(\u002704 - Guardrail Campanha e Horário\u0027).first().json;\nfunction cleanPhone(v) { return String(v || \u0027\u0027).replace(/\\D/g, \u0027\u0027); }\nreturn items.map(item =\u003e {\n  const phone = cleanPhone(item.json.telefone_e164);\n  const validPhone = /^55\\d{10,11}$/.test(phone);\n  const validOptIn = Boolean(item.json.opt_in_at \u0026\u0026 item.json.consentimento_texto);\n  return { json: { ...item.json, telefone_e164: phone, campanha_id: campanha.id, template_id: campanha.template_id, validPhone, validOptIn, eligible: validPhone \u0026\u0026 validOptIn } };\n});"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       620,
+                                       60
+                                   ],
+                      "id":  "1b4a99ef-12fd-48fd-bbb1-6b41cafd31db",
+                      "name":  "07 - Validar Opt-in e Normalizar Telefone"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "4e4e1b0c-3d26-4c06-b8c6-766eade70fa6",
+                                                                                   "leftValue":  "={{ $json.eligible }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       900,
+                                       60
+                                   ],
+                      "id":  "2532c572-07ae-42cb-9bb6-72680f535cb9",
+                      "name":  "08 - Lead Elegível?"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "select * from templates\nwhere id = \u0027{{ $json.template_id }}\u0027\nand status = \u0027approved\u0027\nlimit 1;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       1180,
+                                       -40
+                                   ],
+                      "id":  "8c297fe8-3acd-4276-93bd-064b558470b1",
+                      "name":  "09 - Buscar Template Aprovado"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "select\n  count(*) filter (where sent_at \u003e= now() - interval \u00271 hour\u0027) as enviados_hora,\n  count(*) filter (where sent_at::date = now()::date) as enviados_dia\nfrom disparos\nwhere campanha_id = \u0027{{ $json.campanha_id }}\u0027\nand status in (\u0027sent\u0027,\u0027delivered\u0027,\u0027read\u0027);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       1180,
+                                       160
+                                   ],
+                      "id":  "d4539eed-f4d5-4b29-b378-df9d7391b9ac",
+                      "name":  "10 - Checar Volume Hora Dia"
+                  },
+                  {
+                      "parameters":  {
+                                         "mode":  "combine",
+                                         "combineBy":  "combineByPosition",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.merge",
+                      "typeVersion":  3,
+                      "position":  [
+                                       1450,
+                                       60
+                                   ],
+                      "id":  "146ddf00-613c-4d8e-8d3f-866f99b863bd",
+                      "name":  "11 - Juntar Template e Volume"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const contato = $(\u002707 - Validar Opt-in e Normalizar Telefone\u0027).first().json;\nconst campanha = $(\u002704 - Guardrail Campanha e Horário\u0027).first().json;\nconst template = $(\u002709 - Buscar Template Aprovado\u0027).first()?.json || {};\nconst volume = $(\u002710 - Checar Volume Hora Dia\u0027).first()?.json || {};\nconst hourlyLimit = Number(campanha.hourly_limit || 10);\nconst dailyLimit = Number(campanha.daily_limit || 50);\nconst enviadosHora = Number(volume.enviados_hora || 0);\nconst enviadosDia = Number(volume.enviados_dia || 0);\nconst canSend = template.nome_meta \u0026\u0026 enviadosHora \u003c hourlyLimit \u0026\u0026 enviadosDia \u003c dailyLimit;\nreturn [{ json: { contato, campanha, template, volume: { enviadosHora, enviadosDia, hourlyLimit, dailyLimit }, canSend, blockReason: canSend ? null : \u0027limite_ou_template_invalido\u0027 } }];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1720,
+                                       60
+                                   ],
+                      "id":  "73f7d33e-5092-4d5f-9e92-7bbe4bd99f87",
+                      "name":  "12 - Rate Limit Conservador"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "a1da8903-d555-4544-b828-28f004e32792",
+                                                                                   "leftValue":  "={{ $json.canSend }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       2000,
+                                       60
+                                   ],
+                      "id":  "6b6e2c46-a0e3-470d-a99a-5ed495055468",
+                      "name":  "13 - Pode Enviar?"
+                  },
+                  {
+                      "parameters":  {
+                                         "amount":  60,
+                                         "unit":  "seconds"
+                                     },
+                      "type":  "n8n-nodes-base.wait",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       2280,
+                                       -40
+                                   ],
+                      "id":  "b337b064-c6b6-4584-8d3b-35e6a6fd28ce",
+                      "name":  "14 - Espaçamento Anti-Spam 60s"
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "={{ \u0027https://graph.facebook.com/\u0027 + ($env.GRAPH_API_VERSION || \u0027v23.0\u0027) + \u0027/\u0027 + $env.WA_PHONE_NUMBER_ID + \u0027/messages\u0027 }}",
+                                         "authentication":  "none",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "={{ \u0027Bearer \u0027 + $env.META_ACCESS_TOKEN }}"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "jsonBody":  "={{ {\n  messaging_product: \u0027whatsapp\u0027,\n  to: $json.contato.telefone_e164,\n  type: \u0027template\u0027,\n  template: {\n    name: $json.template.nome_meta,\n    language: { code: $json.template.idioma || \u0027pt_BR\u0027 },\n    components: [\n      { type: \u0027body\u0027, parameters: [ { type: \u0027text\u0027, text: $json.contato.nome || \u0027cliente\u0027 } ] }\n    ]\n  }\n} }}",
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      },
+                                                         "timeout":  30000
+                                                     },
+                                         "specifyBody":  "json"
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       2560,
+                                       -40
+                                   ],
+                      "id":  "43870b4e-3cd2-4978-afaf-02800300328f",
+                      "name":  "15 - Enviar Template - Meta Cloud API",
+                      "continueOnFail":  true
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into disparos (campanha_id, contato_id, template_id, telefone_e164, wamid, status, payload, sent_at)\nvalues (\n  \u0027{{ $(\u002712 - Rate Limit Conservador\u0027).first().json.campanha.id }}\u0027,\n  \u0027{{ $(\u002712 - Rate Limit Conservador\u0027).first().json.contato.id }}\u0027,\n  \u0027{{ $(\u002712 - Rate Limit Conservador\u0027).first().json.template.id }}\u0027,\n  \u0027{{ $(\u002712 - Rate Limit Conservador\u0027).first().json.contato.telefone_e164 }}\u0027,\n  \u0027{{ $json.messages?.[0]?.id || \"\" }}\u0027,\n  \u0027sent\u0027,\n  \u0027{{ JSON.stringify($json).replace(/\u0027/g, \"\u0027\u0027\") }}\u0027::jsonb,\n  now()\n)\non conflict (campanha_id, contato_id, template_id) do nothing;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       2840,
+                                       -40
+                                   ],
+                      "id":  "4149889d-1ae8-44fa-8153-1f2dd5ce0cd7",
+                      "name":  "16 - Registrar Disparo / Retorno Meta"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into metricas_campanha (campanha_id, enviados, entregues, lidos, respostas, falhas, opt_outs, taxa_entrega, taxa_leitura, taxa_resposta, taxa_falha, taxa_opt_out, atualizado_em)\nselect\n  c.id,\n  count(d.*),\n  count(*) filter (where d.status in (\u0027delivered\u0027,\u0027read\u0027)),\n  count(*) filter (where d.status = \u0027read\u0027),\n  (select count(*) from respostas r join disparos dx on dx.contato_id = r.contato_id where dx.campanha_id = c.id),\n  count(*) filter (where d.status = \u0027failed\u0027),\n  (select count(*) from opt_outs oo join disparos dx on dx.contato_id = oo.contato_id where dx.campanha_id = c.id),\n  round((count(*) filter (where d.status in (\u0027delivered\u0027,\u0027read\u0027))::numeric / nullif(count(d.*),0)) * 100, 2),\n  round((count(*) filter (where d.status = \u0027read\u0027)::numeric / nullif(count(d.*),0)) * 100, 2),\n  null,\n  round((count(*) filter (where d.status = \u0027failed\u0027)::numeric / nullif(count(d.*),0)) * 100, 2),\n  null,\n  now()\nfrom campanhas c\nleft join disparos d on d.campanha_id = c.id\nwhere c.id = \u0027{{ $(\u002712 - Rate Limit Conservador\u0027).first().json.campanha.id }}\u0027\ngroup by c.id\non conflict (campanha_id) do update set\n  enviados=excluded.enviados, entregues=excluded.entregues, lidos=excluded.lidos, respostas=excluded.respostas, falhas=excluded.falhas, opt_outs=excluded.opt_outs, taxa_entrega=excluded.taxa_entrega, taxa_leitura=excluded.taxa_leitura, taxa_falha=excluded.taxa_falha, atualizado_em=now();",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       3120,
+                                       -40
+                                   ],
+                      "id":  "6cd87591-a02f-4231-8fe4-68ab62f97895",
+                      "name":  "17 - Atualizar Métricas"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "update campanhas c\nset status = \u0027paused_auto\u0027\nfrom metricas_campanha m\nwhere m.campanha_id = c.id\nand c.id = \u0027{{ $(\u002712 - Rate Limit Conservador\u0027).first().json.campanha.id }}\u0027\nand m.enviados \u003e= 50\nand (coalesce(m.taxa_falha,0) \u003e 8 or coalesce(m.taxa_entrega,100) \u003c 85 or coalesce(m.taxa_opt_out,0) \u003e 1.5);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       3400,
+                                       -40
+                                   ],
+                      "id":  "b984d802-7081-4888-9db2-bc8bc84f29a2",
+                      "name":  "18 - Pausar Se Métricas Ruins"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into logs_erros (contexto, erro) values (\u0027dispatcher_contato_inelegivel_ou_bloqueado\u0027, \u0027{{ JSON.stringify($json).replace(/\u0027/g, \"\u0027\u0027\") }}\u0027::jsonb);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       1180,
+                                       360
+                                   ],
+                      "id":  "b312e6ea-8142-4b5d-a220-4a3de4bff76c",
+                      "name":  "LOG - Contato Bloqueado ou Inelegível"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into logs_erros (contexto, erro) values (\u0027dispatcher_rate_limit_ou_template\u0027, \u0027{{ JSON.stringify($json).replace(/\u0027/g, \"\u0027\u0027\") }}\u0027::jsonb);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       2280,
+                                       260
+                                   ],
+                      "id":  "0eefcd19-be81-41fa-81c3-b61bcda343b1",
+                      "name":  "LOG - Envio Bloqueado por Rate Limit"
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# INBOUND\n\n# WA Cloud - Webhook Respostas\n\nRecebe mensagens dos usuários, registra resposta, detecta opt-out e atualiza contato.\n\nPalavras de opt-out: parar, sair, cancelar, remover.\n\nConfigure este webhook no App Meta para o campo messages.",
+                                         "height":  340,
+                                         "width":  640,
+                                         "color":  5
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -900,
+                                       700
+                                   ],
+                      "id":  "3199d919-b7cd-40b7-bd15-a1c021ce823d",
+                      "name":  "INBOUND - README - Webhook Inbound"
+                  },
+                  {
+                      "parameters":  {
+                                         "path":  "wa-cloud-inbound",
+                                         "httpMethod":  "GET",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2.1,
+                      "position":  [
+                                       -720,
+                                       900
+                                   ],
+                      "id":  "be9d7894-d12e-46cd-a4a8-edaa0decfcc1",
+                      "name":  "01 - Webhook GET Verificação Meta"
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "text",
+                                         "responseBody":  "={{ $json.query[\"hub.challenge\"] || \"ok\" }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.4,
+                      "position":  [
+                                       -120,
+                                       900
+                                   ],
+                      "id":  "619a5f7c-7d95-4062-bb92-618c85604cd9",
+                      "name":  "02 - Responder Challenge"
+                  },
+                  {
+                      "parameters":  {
+                                         "path":  "wa-cloud-inbound",
+                                         "httpMethod":  "POST",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2.1,
+                      "position":  [
+                                       -720,
+                                       1260
+                                   ],
+                      "id":  "bd508904-c5fa-48e9-87d5-afcdcc8bcbf0",
+                      "name":  "03 - Webhook POST Respostas"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const out = [];\nfor (const item of items) {\n  const body = item.json.body || item.json;\n  for (const entry of body.entry || []) {\n    for (const change of entry.changes || []) {\n      const value = change.value || {};\n      for (const msg of value.messages || []) {\n        out.push({ json: {\n          telefone_e164: msg.from,\n          wamid: msg.id,\n          texto: msg.text?.body || msg.button?.text || msg.interactive?.button_reply?.title || \u0027\u0027,\n          timestamp: msg.timestamp,\n          payload: body\n        }});\n      }\n    }\n  }\n}\nreturn out.length ? out : [{ json: { ignored: true } }];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -420,
+                                       1260
+                                   ],
+                      "id":  "3d03f7ef-7a5d-4caf-bec8-6d5194548085",
+                      "name":  "04 - Extrair Mensagens Recebidas"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into eventos_webhook (tipo, wamid, payload) values (\u0027inbound_message\u0027, \u0027{{ $json.wamid || \"\" }}\u0027, \u0027{{ JSON.stringify($json.payload || $json).replace(/\u0027/g, \"\u0027\u0027\") }}\u0027::jsonb);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       -120,
+                                       1260
+                                   ],
+                      "id":  "d964e684-fcaa-4551-9821-408c989be4d6",
+                      "name":  "05 - Registrar Evento Webhook"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into contatos (telefone_e164, last_inbound_at)\nvalues (\u0027{{ $json.telefone_e164 }}\u0027, now())\non conflict (telefone_e164) do update set last_inbound_at = now();\n\ninsert into respostas (contato_id, telefone_e164, wamid, texto, payload)\nselect id, \u0027{{ $json.telefone_e164 }}\u0027, \u0027{{ $json.wamid }}\u0027, \u0027{{ ($json.texto || \"\").replace(/\u0027/g, \"\u0027\u0027\") }}\u0027, \u0027{{ JSON.stringify($json.payload || {}).replace(/\u0027/g, \"\u0027\u0027\") }}\u0027::jsonb\nfrom contatos where telefone_e164 = \u0027{{ $json.telefone_e164 }}\u0027;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       180,
+                                       1260
+                                   ],
+                      "id":  "35a8efae-402e-4b91-a0e1-6e4e3f4ae4d6",
+                      "name":  "06 - Upsert Contato e Resposta"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const words = [\u0027parar\u0027,\u0027sair\u0027,\u0027cancelar\u0027,\u0027remover\u0027];\nreturn items.map(item =\u003e {\n  const texto = String(item.json.texto || \u0027\u0027).normalize(\u0027NFD\u0027).replace(/[\\u0300-\\u036f]/g,\u0027\u0027).toLowerCase().trim();\n  return { json: { ...item.json, isOptOut: words.includes(texto), optOutWord: words.includes(texto) ? texto : null } };\n});"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       480,
+                                       1260
+                                   ],
+                      "id":  "3e317090-5349-4cd8-a150-2b7f6a895e67",
+                      "name":  "07 - Detectar Opt-out"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "f0ab3770-64a3-4004-bfda-f254a37997e1",
+                                                                                   "leftValue":  "={{ $json.isOptOut }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       760,
+                                       1260
+                                   ],
+                      "id":  "e83cf781-da94-4b07-8ae3-c38bdbd45820",
+                      "name":  "08 - É Opt-out?"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into opt_outs (contato_id, telefone_e164, palavra, origem)\nselect id, telefone_e164, \u0027{{ $json.optOutWord }}\u0027, \u0027whatsapp\u0027 from contatos where telefone_e164 = \u0027{{ $json.telefone_e164 }}\u0027\non conflict do nothing;\nupdate contatos set status = \u0027opt_out\u0027 where telefone_e164 = \u0027{{ $json.telefone_e164 }}\u0027;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       1040,
+                                       1160
+                                   ],
+                      "id":  "ca41f75c-407a-4b21-b0dd-e6fec6506626",
+                      "name":  "09 - Gravar Opt-out e Bloquear"
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "text",
+                                         "responseBody":  "ok",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.4,
+                      "position":  [
+                                       1040,
+                                       1380
+                                   ],
+                      "id":  "741f3ff6-007a-4ee2-9b4d-517b6fcd158b",
+                      "name":  "10 - Responder 200 Meta"
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# STATUS\n\n# WA Cloud - Webhook Status\n\nRecebe eventos sent, delivered, read e failed da Meta.\nAtualiza disparos, salva payload bruto, recalcula métricas e pausa campanha automaticamente.",
+                                         "height":  300,
+                                         "width":  620,
+                                         "color":  5
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -900,
+                                       1500
+                                   ],
+                      "id":  "6dc06d6f-dc6d-49eb-9b9e-f3b4545a567d",
+                      "name":  "STATUS - README - Webhook Status"
+                  },
+                  {
+                      "parameters":  {
+                                         "path":  "wa-cloud-status",
+                                         "httpMethod":  "POST",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2.1,
+                      "position":  [
+                                       -700,
+                                       1720
+                                   ],
+                      "id":  "ca0003e2-e012-4fe6-a7b0-5adf9fa8e560",
+                      "name":  "01 - Webhook POST Status Meta"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const out=[];\nfor (const item of items) {\n const body=item.json.body || item.json;\n for (const entry of body.entry || []) {\n  for (const change of entry.changes || []) {\n   const value=change.value || {};\n   for (const st of value.statuses || []) {\n    out.push({ json:{ wamid:st.id, status:st.status, timestamp:st.timestamp, recipient_id:st.recipient_id, errors:st.errors || [], payload:body }});\n   }\n  }\n }\n}\nreturn out.length ? out : [{ json:{ ignored:true }}];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -400,
+                                       1720
+                                   ],
+                      "id":  "bbe87e60-e4c8-4987-a5ba-e5f93d0e6731",
+                      "name":  "02 - Extrair Status"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into eventos_webhook (tipo, wamid, payload) values (\u0027message_status\u0027, \u0027{{ $json.wamid || \"\" }}\u0027, \u0027{{ JSON.stringify($json.payload || $json).replace(/\u0027/g, \"\u0027\u0027\") }}\u0027::jsonb);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       -100,
+                                       1720
+                                   ],
+                      "id":  "ddd9fa9f-08cb-43c7-866a-770ccf440f27",
+                      "name":  "03 - Registrar Evento Status"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "update disparos set\nstatus = \u0027{{ $json.status }}\u0027,\ndelivered_at = case when \u0027{{ $json.status }}\u0027 = \u0027delivered\u0027 then now() else delivered_at end,\nread_at = case when \u0027{{ $json.status }}\u0027 = \u0027read\u0027 then now() else read_at end,\nfailed_at = case when \u0027{{ $json.status }}\u0027 = \u0027failed\u0027 then now() else failed_at end,\nerro = case when \u0027{{ $json.status }}\u0027 = \u0027failed\u0027 then \u0027{{ JSON.stringify($json.errors || []).replace(/\u0027/g, \"\u0027\u0027\") }}\u0027::jsonb else erro end\nwhere wamid = \u0027{{ $json.wamid }}\u0027\nreturning campanha_id;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       200,
+                                       1720
+                                   ],
+                      "id":  "e6122c9a-5f35-4c8b-8e20-c74a94a54a68",
+                      "name":  "04 - Atualizar Disparo"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "insert into metricas_campanha (campanha_id, enviados, entregues, lidos, respostas, falhas, opt_outs, taxa_entrega, taxa_leitura, taxa_falha, taxa_opt_out, atualizado_em)\nselect\n  d.campanha_id,\n  count(*),\n  count(*) filter (where d.status in (\u0027delivered\u0027,\u0027read\u0027)),\n  count(*) filter (where d.status = \u0027read\u0027),\n  (select count(*) from respostas r join disparos dx on dx.contato_id = r.contato_id where dx.campanha_id = d.campanha_id),\n  count(*) filter (where d.status = \u0027failed\u0027),\n  (select count(*) from opt_outs oo join disparos dx on dx.contato_id = oo.contato_id where dx.campanha_id = d.campanha_id),\n  round((count(*) filter (where d.status in (\u0027delivered\u0027,\u0027read\u0027))::numeric / nullif(count(*),0)) * 100, 2),\n  round((count(*) filter (where d.status = \u0027read\u0027)::numeric / nullif(count(*),0)) * 100, 2),\n  round((count(*) filter (where d.status = \u0027failed\u0027)::numeric / nullif(count(*),0)) * 100, 2),\n  null,\n  now()\nfrom disparos d\nwhere d.campanha_id = \u0027{{ $json.campanha_id }}\u0027\ngroup by d.campanha_id\non conflict (campanha_id) do update set enviados=excluded.enviados, entregues=excluded.entregues, lidos=excluded.lidos, respostas=excluded.respostas, falhas=excluded.falhas, opt_outs=excluded.opt_outs, taxa_entrega=excluded.taxa_entrega, taxa_leitura=excluded.taxa_leitura, taxa_falha=excluded.taxa_falha, atualizado_em=now()\nRETURNING campanha_id;",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       500,
+                                       1720
+                                   ],
+                      "id":  "79484afa-57d1-4af4-8f56-66bed9112a41",
+                      "name":  "05 - Recalcular Métricas Campanha"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "executeQuery",
+                                         "query":  "update campanhas c\nset status = \u0027paused_auto\u0027\nfrom metricas_campanha m\nwhere m.campanha_id = c.id\nand c.id = \u0027{{ $(\u002704 - Atualizar Disparo\u0027).first().json.campanha_id }}\u0027\nand m.enviados \u003e= 50\nand (coalesce(m.taxa_falha,0) \u003e 8 or coalesce(m.taxa_entrega,100) \u003c 85 or coalesce(m.taxa_opt_out,0) \u003e 1.5);",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.postgres",
+                      "typeVersion":  2.6,
+                      "position":  [
+                                       800,
+                                       1720
+                                   ],
+                      "id":  "ca4a8d62-9856-4cd9-82de-3ad80aee05a3",
+                      "name":  "06 - Pausa Automática"
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "text",
+                                         "responseBody":  "ok",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.4,
+                      "position":  [
+                                       1100,
+                                       1720
+                                   ],
+                      "id":  "85ee9b18-0538-4610-b70e-dc11b1b9e3da",
+                      "name":  "07 - Responder 200 Meta"
+                  },
+                  {
+                      "id":  "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                      "name":  "Validar Verify Token",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       -420,
+                                       900
+                                   ],
+                      "parameters":  {
+                                         "options":  {
+
+                                                     },
+                                         "conditions":  {
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "operator":  {
+                                                                                                    "operation":  "equals",
+                                                                                                    "type":  "string"
+                                                                                                },
+                                                                                   "rightValue":  "wa_verify_yw9mxioM8CAOPufG",
+                                                                                   "id":  "tk-check-01",
+                                                                                   "leftValue":  "={{ $json.query[\u0027hub.verify_token\u0027] }}"
+                                                                               }
+                                                                           ],
+                                                            "options":  {
+                                                                            "typeValidation":  "strict",
+                                                                            "leftValue":  "",
+                                                                            "caseSensitive":  true
+                                                                        },
+                                                            "combinator":  "and"
+                                                        }
+                                     }
+                  },
+                  {
+                      "id":  "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                      "name":  "Recusar Token Inválido",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.4,
+                      "position":  [
+                                       -120,
+                                       1060
+                                   ],
+                      "parameters":  {
+                                         "responseBody":  "Forbidden",
+                                         "respondWith":  "text",
+                                         "options":  {
+                                                         "responseCode":  403
+                                                     }
+                                     }
+                  }
+              ],
+    "connections":  {
+                        "01 - Trigger Manual Setup":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  "02 - Criar Tabelas Compliance",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      },
+                        "02 - Criar Tabelas Compliance":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "03 - Resultado Setup",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "01 - Trigger Manual - Teste Seguro":  {
+                                                                   "main":  [
+                                                                                [
+                                                                                    {
+                                                                                        "node":  "03 - Buscar Campanhas Ativas",
+                                                                                        "type":  "main",
+                                                                                        "index":  0
+                                                                                    }
+                                                                                ]
+                                                                            ]
+                                                               },
+                        "02 - Trigger Agendado - Horário Comercial":  {
+                                                                          "main":  [
+                                                                                       [
+                                                                                           {
+                                                                                               "node":  "03 - Buscar Campanhas Ativas",
+                                                                                               "type":  "main",
+                                                                                               "index":  0
+                                                                                           }
+                                                                                       ]
+                                                                                   ]
+                                                                      },
+                        "03 - Buscar Campanhas Ativas":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "04 - Guardrail Campanha e Horário",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                        "04 - Guardrail Campanha e Horário":  {
+                                                                  "main":  [
+                                                                               [
+                                                                                   {
+                                                                                       "node":  "05 - Pode Operar Agora?",
+                                                                                       "type":  "main",
+                                                                                       "index":  0
+                                                                                   }
+                                                                               ]
+                                                                           ]
+                                                              },
+                        "05 - Pode Operar Agora?":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "06 - Buscar Contatos com Opt-in Válido",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ],
+                                                                     [
+                                                                         {
+                                                                             "node":  "LOG - Envio Bloqueado por Rate Limit",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "06 - Buscar Contatos com Opt-in Válido":  {
+                                                                       "main":  [
+                                                                                    [
+                                                                                        {
+                                                                                            "node":  "07 - Validar Opt-in e Normalizar Telefone",
+                                                                                            "type":  "main",
+                                                                                            "index":  0
+                                                                                        }
+                                                                                    ]
+                                                                                ]
+                                                                   },
+                        "07 - Validar Opt-in e Normalizar Telefone":  {
+                                                                          "main":  [
+                                                                                       [
+                                                                                           {
+                                                                                               "node":  "08 - Lead Elegível?",
+                                                                                               "type":  "main",
+                                                                                               "index":  0
+                                                                                           }
+                                                                                       ]
+                                                                                   ]
+                                                                      },
+                        "08 - Lead Elegível?":  {
+                                                    "main":  [
+                                                                 [
+                                                                     {
+                                                                         "node":  "09 - Buscar Template Aprovado",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     },
+                                                                     {
+                                                                         "node":  "10 - Checar Volume Hora Dia",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ],
+                                                                 [
+                                                                     {
+                                                                         "node":  "LOG - Contato Bloqueado ou Inelegível",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ]
+                                                             ]
+                                                },
+                        "09 - Buscar Template Aprovado":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "11 - Juntar Template e Volume",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "10 - Checar Volume Hora Dia":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "11 - Juntar Template e Volume",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "11 - Juntar Template e Volume":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "12 - Rate Limit Conservador",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "12 - Rate Limit Conservador":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "13 - Pode Enviar?",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "13 - Pode Enviar?":  {
+                                                  "main":  [
+                                                               [
+                                                                   {
+                                                                       "node":  "14 - Espaçamento Anti-Spam 60s",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ],
+                                                               [
+                                                                   {
+                                                                       "node":  "LOG - Envio Bloqueado por Rate Limit",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ]
+                                                           ]
+                                              },
+                        "14 - Espaçamento Anti-Spam 60s":  {
+                                                               "main":  [
+                                                                            [
+                                                                                {
+                                                                                    "node":  "15 - Enviar Template - Meta Cloud API",
+                                                                                    "type":  "main",
+                                                                                    "index":  0
+                                                                                }
+                                                                            ]
+                                                                        ]
+                                                           },
+                        "15 - Enviar Template - Meta Cloud API":  {
+                                                                      "main":  [
+                                                                                   [
+                                                                                       {
+                                                                                           "node":  "16 - Registrar Disparo / Retorno Meta",
+                                                                                           "type":  "main",
+                                                                                           "index":  0
+                                                                                       }
+                                                                                   ]
+                                                                               ]
+                                                                  },
+                        "16 - Registrar Disparo / Retorno Meta":  {
+                                                                      "main":  [
+                                                                                   [
+                                                                                       {
+                                                                                           "node":  "17 - Atualizar Métricas",
+                                                                                           "type":  "main",
+                                                                                           "index":  0
+                                                                                       }
+                                                                                   ]
+                                                                               ]
+                                                                  },
+                        "17 - Atualizar Métricas":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "18 - Pausar Se Métricas Ruins",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "01 - Webhook GET Verificação Meta":  {
+                                                                  "main":  [
+                                                                               [
+                                                                                   {
+                                                                                       "node":  "Validar Verify Token",
+                                                                                       "type":  "main",
+                                                                                       "index":  0
+                                                                                   }
+                                                                               ]
+                                                                           ]
+                                                              },
+                        "03 - Webhook POST Respostas":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "04 - Extrair Mensagens Recebidas",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "04 - Extrair Mensagens Recebidas":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "05 - Registrar Evento Webhook",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                        "05 - Registrar Evento Webhook":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "06 - Upsert Contato e Resposta",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "06 - Upsert Contato e Resposta":  {
+                                                               "main":  [
+                                                                            [
+                                                                                {
+                                                                                    "node":  "07 - Detectar Opt-out",
+                                                                                    "type":  "main",
+                                                                                    "index":  0
+                                                                                }
+                                                                            ]
+                                                                        ]
+                                                           },
+                        "07 - Detectar Opt-out":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "08 - É Opt-out?",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "08 - É Opt-out?":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "09 - Gravar Opt-out e Bloquear",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ],
+                                                             [
+                                                                 {
+                                                                     "node":  "10 - Responder 200 Meta",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "09 - Gravar Opt-out e Bloquear":  {
+                                                               "main":  [
+                                                                            [
+                                                                                {
+                                                                                    "node":  "10 - Responder 200 Meta",
+                                                                                    "type":  "main",
+                                                                                    "index":  0
+                                                                                }
+                                                                            ]
+                                                                        ]
+                                                           },
+                        "01 - Webhook POST Status Meta":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "02 - Extrair Status",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "02 - Extrair Status":  {
+                                                    "main":  [
+                                                                 [
+                                                                     {
+                                                                         "node":  "03 - Registrar Evento Status",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ]
+                                                             ]
+                                                },
+                        "03 - Registrar Evento Status":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "04 - Atualizar Disparo",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                        "04 - Atualizar Disparo":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "05 - Recalcular Métricas Campanha",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   },
+                        "05 - Recalcular Métricas Campanha":  {
+                                                                  "main":  [
+                                                                               [
+                                                                                   {
+                                                                                       "node":  "06 - Pausa Automática",
+                                                                                       "type":  "main",
+                                                                                       "index":  0
+                                                                                   }
+                                                                               ]
+                                                                           ]
+                                                              },
+                        "06 - Pausa Automática":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "07 - Responder 200 Meta",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "Validar Verify Token":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "02 - Responder Challenge",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ],
+                                                                  [
+                                                                      {
+                                                                          "node":  "Recusar Token Inválido",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "saveManualExecutions":  true,
+                     "callerPolicy":  "workflowsFromSameOwner"
+                 }
+}

@@ -1,0 +1,164 @@
+﻿{
+    "name":  "Support dashboard - UI",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "path":  "dashboard-atendimento-painel-05f4a1785bc3458c",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "WebhookDashboardUI",
+                      "name":  "Webhook - Dashboard UI",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -260,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "text",
+                                         "responseBody":  "\u003c!doctype html\u003e\u003chtml lang=\"pt-BR\"\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width,initial-scale=1\"\u003e\u003ctitle\u003eAtendimento SaaS\u003c/title\u003e\u003cstyle\u003e:root{--bg:#f5f7fb;--surface:#fff;--line:#e5e7eb;--text:#101828;--muted:#667085;--brand:#2563eb;--brand2:#0f766e;--danger:#b42318;--warn:#b54708;--ok:#067647}*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}.app{display:grid;grid-template-columns:244px 1fr;min-height:100vh}.side{background:#0f172a;color:#cbd5e1;padding:18px 14px;display:flex;flex-direction:column;gap:18px}.logo{display:flex;align-items:center;gap:10px;padding:6px 8px;color:white;font-weight:750}.mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#38bdf8,#22c55e);display:grid;place-items:center;color:#052e16;font-weight:900}.nav{display:grid;gap:4px}.nav button{all:unset;display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:7px;cursor:pointer;color:#cbd5e1}.nav button.active,.nav button:hover{background:#1e293b;color:white}.side small{color:#94a3b8;padding:0 8px}.main{min-width:0}.top{height:64px;background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px}.top h1{font-size:18px;margin:0}.top p{margin:2px 0 0;color:var(--muted);font-size:12px}.actions{display:flex;gap:8px;align-items:center}.btn{border:1px solid #d0d5dd;background:#fff;color:#344054;border-radius:7px;height:34px;padding:0 11px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:13px}.btn.primary{background:var(--brand);border-color:var(--brand);color:white}.btn.danger{color:var(--danger)}.content{padding:20px 24px;display:grid;gap:18px}.cards{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:12px}.card,.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px}.card{padding:14px}.label{color:var(--muted);font-size:12px}.num{font-size:26px;font-weight:760;margin-top:8px}.grid2{display:grid;grid-template-columns:1.25fr .75fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.panel{padding:16px;min-width:0}.panel h2{font-size:15px;margin:0 0 12px}.section{display:none}.section.active{display:grid;gap:18px}.row{display:grid;grid-template-columns:120px 1fr 140px;gap:12px;padding:11px 0;border-top:1px solid #eef0f4;align-items:start}.row:first-of-type{border-top:0}.badge{display:inline-flex;height:22px;align-items:center;padding:0 8px;border-radius:999px;background:#ecfdf3;color:var(--ok);font-size:12px}.badge.warn{background:#fff7ed;color:var(--warn)}.badge.danger{background:#fef3f2;color:var(--danger)}.listline{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #eef0f4}.listline:first-child{border-top:0}.muted{color:var(--muted)}.kanban{display:grid;grid-template-columns:repeat(4,minmax(210px,1fr));gap:12px;overflow:auto}.col{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px;min-height:220px}.col h3{font-size:13px;margin:0 0 10px;color:#475467}.ticket{background:white;border:1px solid var(--line);border-radius:7px;padding:10px;margin-bottom:10px}.ticket strong{display:block;margin-bottom:4px}.ticket .foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}.msg{padding:10px 0;border-top:1px solid #eef0f4}.msg pre{margin:6px 0 0;white-space:pre-wrap;word-break:break-word;font-family:inherit}.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.form label{display:grid;gap:6px;color:#344054;font-size:13px}.form input,.form textarea,.form select{border:1px solid #d0d5dd;border-radius:7px;padding:9px;background:#fff;color:var(--text);font:inherit}.form textarea{min-height:84px;resize:vertical}.span2{grid-column:span 2}.empty{color:var(--muted);padding:16px 0}.toast{position:fixed;right:18px;bottom:18px;background:#101828;color:white;border-radius:8px;padding:12px 14px;display:none}.toast.show{display:block}.search{width:260px;border:1px solid #d0d5dd;border-radius:7px;height:34px;padding:0 10px}@media(max-width:1100px){.app{grid-template-columns:1fr}.side{position:sticky;top:0;z-index:3;flex-direction:row;overflow:auto}.nav{display:flex}.cards{grid-template-columns:repeat(2,1fr)}.grid2,.grid3,.form{grid-template-columns:1fr}.span2{grid-column:auto}.row{grid-template-columns:1fr}.top{align-items:flex-start;height:auto;padding:14px 16px;gap:12px;flex-direction:column}.content{padding:16px}.search{width:100%}}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003cdiv class=\"app\"\u003e\u003caside class=\"side\"\u003e\u003cdiv class=\"logo\"\u003e\u003cdiv class=\"mark\"\u003eA\u003c/div\u003e\u003cdiv\u003e\u003cdiv\u003eAtendeOS\u003c/div\u003e\u003csmall\u003eSaaS operacional\u003c/small\u003e\u003c/div\u003e\u003c/div\u003e\u003cnav class=\"nav\" id=\"nav\"\u003e\u003cbutton class=\"active\" data-tab=\"overview\"\u003eVisao geral\u003c/button\u003e\u003cbutton data-tab=\"conversations\"\u003eConversas\u003c/button\u003e\u003cbutton data-tab=\"orders\"\u003ePedidos\u003c/button\u003e\u003cbutton data-tab=\"customers\"\u003eClientes\u003c/button\u003e\u003cbutton data-tab=\"handoff\"\u003eFila humana\u003c/button\u003e\u003cbutton data-tab=\"settings\"\u003eConfiguracoes\u003c/button\u003e\u003c/nav\u003e\u003csmall id=\"health\"\u003eConectando...\u003c/small\u003e\u003c/aside\u003e\u003cmain class=\"main\"\u003e\u003cheader class=\"top\"\u003e\u003cdiv\u003e\u003ch1 id=\"businessName\"\u003eDashboard Atendimento\u003c/h1\u003e\u003cp id=\"lastUpdate\"\u003eCarregando dados...\u003c/p\u003e\u003c/div\u003e\u003cdiv class=\"actions\"\u003e\u003cinput id=\"filter\" class=\"search\" placeholder=\"Buscar cliente ou telefone\"\u003e\u003cbutton class=\"btn\" onclick=\"loadData()\"\u003eAtualizar\u003c/button\u003e\u003ca class=\"btn primary\" id=\"openN8n\" href=\"https://<REDACTED_PRIVATE_HOST>/workflow/5KUjdF4xTWBK7o7w\" target=\"_blank\"\u003en8n\u003c/a\u003e\u003c/div\u003e\u003c/header\u003e\u003cdiv class=\"content\"\u003e\u003csection id=\"overview\" class=\"section active\"\u003e\u003cdiv class=\"cards\"\u003e\u003cdiv class=\"card\"\u003e\u003cdiv class=\"label\"\u003eMensagens recebidas hoje\u003c/div\u003e\u003cdiv class=\"num\" id=\"inbound\"\u003e0\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"card\"\u003e\u003cdiv class=\"label\"\u003eRespostas enviadas hoje\u003c/div\u003e\u003cdiv class=\"num\" id=\"outbound\"\u003e0\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"card\"\u003e\u003cdiv class=\"label\"\u003eNovos clientes hoje\u003c/div\u003e\u003cdiv class=\"num\" id=\"newCustomers\"\u003e0\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"card\"\u003e\u003cdiv class=\"label\"\u003ePedidos hoje\u003c/div\u003e\u003cdiv class=\"num\" id=\"ordersToday\"\u003e0\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"card\"\u003e\u003cdiv class=\"label\"\u003eFila humana\u003c/div\u003e\u003cdiv class=\"num\" id=\"openHandoffs\"\u003e0\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"grid2\"\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003ePedidos recentes\u003c/h2\u003e\u003cdiv id=\"recentOrders\"\u003e\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eIntencoes de hoje\u003c/h2\u003e\u003cdiv id=\"intents\"\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"grid2\"\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eMensagens recentes\u003c/h2\u003e\u003cdiv id=\"recentMessages\"\u003e\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eStatus dos pedidos\u003c/h2\u003e\u003cdiv id=\"statusList\"\u003e\u003c/div\u003e\u003c/div\u003e\u003c/div\u003e\u003c/section\u003e\u003csection id=\"conversations\" class=\"section\"\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eConversas\u003c/h2\u003e\u003cdiv id=\"conversationList\"\u003e\u003c/div\u003e\u003c/div\u003e\u003c/section\u003e\u003csection id=\"orders\" class=\"section\"\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eKanban de pedidos\u003c/h2\u003e\u003cdiv id=\"kanban\" class=\"kanban\"\u003e\u003c/div\u003e\u003c/div\u003e\u003c/section\u003e\u003csection id=\"customers\" class=\"section\"\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eClientes\u003c/h2\u003e\u003cdiv id=\"customerList\"\u003e\u003c/div\u003e\u003c/div\u003e\u003c/section\u003e\u003csection id=\"handoff\" class=\"section\"\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eFila de atendimento humano\u003c/h2\u003e\u003cdiv id=\"handoffList\"\u003e\u003c/div\u003e\u003c/div\u003e\u003c/section\u003e\u003csection id=\"settings\" class=\"section\"\u003e\u003cdiv class=\"grid2\"\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eEmpresa\u003c/h2\u003e\u003cform id=\"businessForm\" class=\"form\"\u003e\u003clabel\u003eNome\u003cinput name=\"name\"\u003e\u003c/label\u003e\u003clabel\u003eWhatsApp\u003cinput name=\"phone\"\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003eEndereco\u003cinput name=\"address\"\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003eHorario\u003ctextarea name=\"hours\"\u003e\u003c/textarea\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003eRegras de entrega\u003ctextarea name=\"delivery_rules\"\u003e\u003c/textarea\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003eCardapio, um item por linha\u003ctextarea name=\"menu_text\"\u003e\u003c/textarea\u003e\u003c/label\u003e\u003cdiv class=\"span2\"\u003e\u003cbutton class=\"btn primary\" type=\"submit\"\u003eSalvar empresa\u003c/button\u003e\u003c/div\u003e\u003c/form\u003e\u003c/div\u003e\u003cdiv class=\"panel\"\u003e\u003ch2\u003eBot\u003c/h2\u003e\u003cform id=\"botForm\" class=\"form\"\u003e\u003clabel\u003eResposta automatica\u003cselect name=\"auto_reply_enabled\"\u003e\u003coption value=\"true\"\u003eAtiva\u003c/option\u003e\u003coption value=\"false\"\u003ePausada\u003c/option\u003e\u003c/select\u003e\u003c/label\u003e\u003clabel\u003eAtendimento humano\u003cselect name=\"human_handoff_enabled\"\u003e\u003coption value=\"true\"\u003eAtivo\u003c/option\u003e\u003coption value=\"false\"\u003ePausado\u003c/option\u003e\u003c/select\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003eMensagem inicial\u003ctextarea name=\"welcome_message\"\u003e\u003c/textarea\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003eFallback\u003ctextarea name=\"fallback_message\"\u003e\u003c/textarea\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003eMensagem de cardapio\u003ctextarea name=\"catalog_message\"\u003e\u003c/textarea\u003e\u003c/label\u003e\u003clabel class=\"span2\"\u003ePrompt de pedido\u003ctextarea name=\"order_prompt\"\u003e\u003c/textarea\u003e\u003c/label\u003e\u003cdiv class=\"span2\"\u003e\u003cbutton class=\"btn primary\" type=\"submit\"\u003eSalvar bot\u003c/button\u003e\u003c/div\u003e\u003c/form\u003e\u003c/div\u003e\u003c/div\u003e\u003c/section\u003e\u003c/div\u003e\u003c/main\u003e\u003c/div\u003e\u003cdiv id=\"toast\" class=\"toast\"\u003e\u003c/div\u003e\u003cscript\u003econst DATA_URL=\u0027/webhook/dashboard-atendimento-data-painel-05f4a1785bc3458c\u0027;const ACTION_URL=\u0027/webhook/dashboard-atendimento-action-painel-05f4a1785bc3458c\u0027;let state={};const $=id=\u003edocument.getElementById(id);const fmt=n=\u003eNumber(n||0).toLocaleString(\u0027pt-BR\u0027);const money=n=\u003eNumber(n||0).toLocaleString(\u0027pt-BR\u0027,{style:\u0027currency\u0027,currency:\u0027BRL\u0027});const dt=v=\u003ev?new Date(v).toLocaleString(\u0027pt-BR\u0027):\u0027-\u0027;const wa=p=\u003ep?\u0027https://wa.me/\u0027+p:\u0027#\u0027;function toast(t){$(\u0027toast\u0027).textContent=t;$(\u0027toast\u0027).className=\u0027toast show\u0027;setTimeout(()=\u003e$(\u0027toast\u0027).className=\u0027toast\u0027,2400)}function empty(id,t){$(id).innerHTML=\u0027\u003cdiv class=\"empty\"\u003e\u0027+t+\u0027\u003c/div\u003e\u0027}function render(id,items,fn,t){let q=($(\u0027filter\u0027).value||\u0027\u0027).toLowerCase();let arr=(items||[]).filter(x=\u003e!q||JSON.stringify(x).toLowerCase().includes(q));if(!arr.length)return empty(id,t);$(id).innerHTML=arr.map(fn).join(\u0027\u0027)}async function action(payload){const r=await fetch(ACTION_URL,{method:\u0027POST\u0027,headers:{\u0027Content-Type\u0027:\u0027application/json\u0027},body:JSON.stringify(payload)});if(!r.ok)throw new Error(await r.text());toast(\u0027Salvo\u0027);await loadData()}function setTab(tab){document.querySelectorAll(\u0027.section\u0027).forEach(e=\u003ee.classList.remove(\u0027active\u0027));document.querySelectorAll(\u0027.nav button\u0027).forEach(e=\u003ee.classList.remove(\u0027active\u0027));$(tab).classList.add(\u0027active\u0027);document.querySelector(\u0027[data-tab=\"\u0027+tab+\u0027\"]\u0027).classList.add(\u0027active\u0027)}function badge(status){let cls=status===\u0027waiting\u0027||status===\u0027collecting_info\u0027?\u0027warn\u0027:status===\u0027cancelled\u0027?\u0027danger\u0027:\u0027\u0027;return \u0027\u003cspan class=\"badge \u0027+cls+\u0027\"\u003e\u0027+(status||\u0027-\u0027)+\u0027\u003c/span\u003e\u0027}function rowCustomer(c){return \u0027\u003cdiv class=\"row\"\u003e\u003cdiv\u003e\u0027+badge(\u0027cliente\u0027)+\u0027\u003c/div\u003e\u003cdiv\u003e\u003cstrong\u003e\u0027+(c.name||\u0027Cliente\u0027)+\u0027\u003c/strong\u003e\u003cdiv class=\"muted\"\u003e\u0027+(c.phone_e164||\u0027\u0027)+\u0027\u003c/div\u003e\u003cdiv class=\"muted\"\u003eUltimo contato: \u0027+dt(c.last_seen_at)+\u0027\u003c/div\u003e\u003c/div\u003e\u003cdiv\u003e\u003ca class=\"btn\" target=\"_blank\" href=\"\u0027+wa(c.phone_e164)+\u0027\"\u003eWhatsApp\u003c/a\u003e\u003c/div\u003e\u003c/div\u003e\u0027}function rowOrder(o){return \u0027\u003cdiv class=\"row\"\u003e\u003cdiv\u003e\u0027+badge(o.status)+\u0027\u003c/div\u003e\u003cdiv\u003e\u003cstrong\u003e\u0027+(o.customer_name||\u0027Cliente\u0027)+\u0027\u003c/strong\u003e\u003cdiv class=\"muted\"\u003e\u0027+(o.phone_e164||\u0027\u0027)+\u0027 | \u0027+dt(o.created_at)+\u0027\u003c/div\u003e\u003cdiv\u003e\u0027+(o.notes||\u0027Sem observacao\u0027)+\u0027\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"actions\"\u003e\u003ca class=\"btn\" target=\"_blank\" href=\"\u0027+wa(o.phone_e164)+\u0027\"\u003eWhatsApp\u003c/a\u003e\u003cspan\u003e\u0027+money(o.total_amount)+\u0027\u003c/span\u003e\u003c/div\u003e\u003c/div\u003e\u0027}function rowMsg(m){return \u0027\u003cdiv class=\"msg\"\u003e\u003cdiv class=\"muted\"\u003e\u0027+(m.direction||\u0027\u0027)+\u0027 | \u0027+(m.intent||\u0027\u0027)+\u0027 | \u0027+dt(m.sent_at)+\u0027\u003c/div\u003e\u003cstrong\u003e\u0027+(m.customer_name||\u0027\u0027)+\u0027\u003c/strong\u003e \u003cspan class=\"muted\"\u003e\u0027+(m.phone_e164||\u0027\u0027)+\u0027\u003c/span\u003e\u003cpre\u003e\u0027+(m.content||\u0027\u0027)+\u0027\u003c/pre\u003e\u003c/div\u003e\u0027}function fillForms(){const b=state.business||{}, bs=state.bot_settings||{};for(const [k,v] of Object.entries(b)){const el=document.querySelector(\u0027#businessForm [name=\"\u0027+k+\u0027\"]\u0027);if(el)el.value=v||\u0027\u0027}document.querySelector(\u0027#businessForm [name=\"menu_text\"]\u0027).value=(b.menu||[]).join(\u0027\\n\u0027);for(const [k,v] of Object.entries(bs)){const el=document.querySelector(\u0027#botForm [name=\"\u0027+k+\u0027\"]\u0027);if(el)el.value=String(v??\u0027\u0027)}}function renderKanban(){const statuses=[\u0027collecting_info\u0027,\u0027quoted\u0027,\u0027confirmed\u0027,\u0027ready\u0027];const labels={collecting_info:\u0027Coletando dados\u0027,quoted:\u0027Orcado\u0027,confirmed:\u0027Confirmado\u0027,ready:\u0027Pronto\u0027};const orders=state.recent_orders||[];$(\u0027kanban\u0027).innerHTML=statuses.map(st=\u003e\u0027\u003cdiv class=\"col\"\u003e\u003ch3\u003e\u0027+labels[st]+\u0027\u003c/h3\u003e\u0027+orders.filter(o=\u003eo.status===st).map(o=\u003e\u0027\u003cdiv class=\"ticket\"\u003e\u003cstrong\u003e\u0027+(o.customer_name||\u0027Cliente\u0027)+\u0027\u003c/strong\u003e\u003cdiv class=\"muted\"\u003e\u0027+(o.phone_e164||\u0027\u0027)+\u0027\u003c/div\u003e\u003cdiv\u003e\u0027+(o.notes||\u0027\u0027)+\u0027\u003c/div\u003e\u003cdiv class=\"foot\"\u003e\u003cspan\u003e\u0027+money(o.total_amount)+\u0027\u003c/span\u003e\u003cselect onchange=\"action({action:\\\u0027update_order_status\\\u0027,order_id:\\\u0027\u0027+o.id+\u0027\\\u0027,status:this.value})\"\u003e\u003coption value=\"\u0027+o.status+\u0027\"\u003eMover\u003c/option\u003e\u003coption value=\"quoted\"\u003eOrcado\u003c/option\u003e\u003coption value=\"confirmed\"\u003eConfirmado\u003c/option\u003e\u003coption value=\"in_production\"\u003eProducao\u003c/option\u003e\u003coption value=\"ready\"\u003ePronto\u003c/option\u003e\u003coption value=\"delivered\"\u003eEntregue\u003c/option\u003e\u003coption value=\"cancelled\"\u003eCancelado\u003c/option\u003e\u003c/select\u003e\u003c/div\u003e\u003c/div\u003e\u0027).join(\u0027\u0027)+\u0027\u003c/div\u003e\u0027).join(\u0027\u0027)}function hydrate(){const s=state.summary||{};$(\u0027businessName\u0027).textContent=(state.business\u0026\u0026state.business.name)||\u0027Dashboard Atendimento\u0027;$(\u0027lastUpdate\u0027).textContent=\u0027Atualizado em \u0027+new Date().toLocaleString(\u0027pt-BR\u0027);$(\u0027health\u0027).textContent=\u0027Online | \u0027+((state.business\u0026\u0026state.business.slug)||\u0027empresa\u0027);$(\u0027inbound\u0027).textContent=fmt(s.inbound_messages_today);$(\u0027outbound\u0027).textContent=fmt(s.outbound_messages_today);$(\u0027newCustomers\u0027).textContent=fmt(s.new_customers_today);$(\u0027ordersToday\u0027).textContent=fmt(s.orders_today);$(\u0027openHandoffs\u0027).textContent=fmt(s.open_handoffs);render(\u0027recentOrders\u0027,state.recent_orders,rowOrder,\u0027Nenhum pedido ainda\u0027);render(\u0027recentMessages\u0027,state.recent_messages,rowMsg,\u0027Nenhuma mensagem registrada\u0027);render(\u0027customerList\u0027,state.customers,rowCustomer,\u0027Nenhum cliente ainda\u0027);render(\u0027conversationList\u0027,state.conversations,c=\u003e\u0027\u003cdiv class=\"row\"\u003e\u003cdiv\u003e\u0027+badge(c.status)+\u0027\u003c/div\u003e\u003cdiv\u003e\u003cstrong\u003e\u0027+(c.customer_name||\u0027Cliente\u0027)+\u0027\u003c/strong\u003e\u003cdiv class=\"muted\"\u003e\u0027+(c.phone_e164||\u0027\u0027)+\u0027 | \u0027+(c.last_intent||\u0027\u0027)+\u0027\u003c/div\u003e\u003cdiv\u003eUltima mensagem: \u0027+dt(c.last_message_at)+\u0027\u003c/div\u003e\u003c/div\u003e\u003cdiv\u003e\u003ca class=\"btn\" target=\"_blank\" href=\"\u0027+wa(c.phone_e164)+\u0027\"\u003eWhatsApp\u003c/a\u003e\u003c/div\u003e\u003c/div\u003e\u0027,\u0027Nenhuma conversa ainda\u0027);render(\u0027handoffList\u0027,state.handoff_queue,h=\u003e\u0027\u003cdiv class=\"row\"\u003e\u003cdiv\u003e\u0027+badge(h.status)+\u0027\u003c/div\u003e\u003cdiv\u003e\u003cstrong\u003e\u0027+(h.customer_name||\u0027Cliente\u0027)+\u0027\u003c/strong\u003e\u003cdiv class=\"muted\"\u003e\u0027+(h.phone_e164||\u0027\u0027)+\u0027\u003c/div\u003e\u003cdiv\u003e\u0027+(h.reason||\u0027Solicitou atendimento\u0027)+\u0027\u003c/div\u003e\u003c/div\u003e\u003cdiv class=\"actions\"\u003e\u003ca class=\"btn\" target=\"_blank\" href=\"\u0027+wa(h.phone_e164)+\u0027\"\u003eAbrir\u003c/a\u003e\u003cbutton class=\"btn\" onclick=\"action({action:\\\u0027update_handoff_status\\\u0027,handoff_id:\\\u0027\u0027+h.id+\u0027\\\u0027,status:\\\u0027resolved\\\u0027})\"\u003eResolver\u003c/button\u003e\u003c/div\u003e\u003c/div\u003e\u0027,\u0027Fila humana vazia\u0027);render(\u0027intents\u0027,state.intents_today,x=\u003e\u0027\u003cdiv class=\"listline\"\u003e\u003cspan\u003e\u0027+(x.intent||\u0027sem_intencao\u0027)+\u0027\u003c/span\u003e\u003cstrong\u003e\u0027+fmt(x.total)+\u0027\u003c/strong\u003e\u003c/div\u003e\u0027,\u0027Sem intencoes hoje\u0027);render(\u0027statusList\u0027,state.orders_by_status,x=\u003e\u0027\u003cdiv class=\"listline\"\u003e\u003cspan\u003e\u0027+(x.status||\u0027-\u0027)+\u0027\u003c/span\u003e\u003cstrong\u003e\u0027+fmt(x.total)+\u0027\u003c/strong\u003e\u003c/div\u003e\u0027,\u0027Sem pedidos por status\u0027);renderKanban();fillForms()}async function loadData(){try{$(\u0027lastUpdate\u0027).textContent=\u0027Atualizando...\u0027;const r=await fetch(DATA_URL,{cache:\u0027no-store\u0027});if(!r.ok)throw new Error(await r.text());state=await r.json();hydrate()}catch(e){$(\u0027lastUpdate\u0027).textContent=\u0027Erro ao carregar\u0027;$(\u0027health\u0027).textContent=\u0027Erro\u0027;toast(\u0027Erro ao carregar dados\u0027)}}document.querySelectorAll(\u0027.nav button\u0027).forEach(b=\u003eb.addEventListener(\u0027click\u0027,()=\u003esetTab(b.dataset.tab)));$(\u0027filter\u0027).addEventListener(\u0027input\u0027,hydrate);$(\u0027businessForm\u0027).addEventListener(\u0027submit\u0027,e=\u003e{e.preventDefault();const f=new FormData(e.target);action({action:\u0027update_business\u0027,name:f.get(\u0027name\u0027),phone:f.get(\u0027phone\u0027),address:f.get(\u0027address\u0027),hours:f.get(\u0027hours\u0027),delivery_rules:f.get(\u0027delivery_rules\u0027),menu:String(f.get(\u0027menu_text\u0027)||\u0027\u0027).split(\u0027\\n\u0027).map(x=\u003ex.trim()).filter(Boolean)})});$(\u0027botForm\u0027).addEventListener(\u0027submit\u0027,e=\u003e{e.preventDefault();const f=new FormData(e.target);action({action:\u0027update_bot_settings\u0027,auto_reply_enabled:f.get(\u0027auto_reply_enabled\u0027)===\u0027true\u0027,human_handoff_enabled:f.get(\u0027human_handoff_enabled\u0027)===\u0027true\u0027,welcome_message:f.get(\u0027welcome_message\u0027),fallback_message:f.get(\u0027fallback_message\u0027),catalog_message:f.get(\u0027catalog_message\u0027),order_prompt:f.get(\u0027order_prompt\u0027)})});loadData();\u003c/script\u003e\u003c/body\u003e\u003c/html\u003e",
+                                         "options":  {
+                                                         "responseHeaders":  {
+                                                                                 "entries":  [
+                                                                                                 {
+                                                                                                     "name":  "Content-Type",
+                                                                                                     "value":  "text/html; charset=utf-8"
+                                                                                                 }
+                                                                                             ]
+                                                                             }
+                                                     }
+                                     },
+                      "id":  "ResponderHTML",
+                      "name":  "Responder HTML",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       0,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const headers = $json.headers || {};\nconst auth = headers.authorization || headers.Authorization || \u0027\u0027;\nlet authOk = false;\nif (auth.startsWith(\u0027Basic \u0027)) {\n  try {\n    const decoded = Buffer.from(auth.slice(6), \u0027base64\u0027).toString(\u0027utf8\u0027);\n    authOk = decoded === \u0027admin:ma1210151\u0027;\n  } catch (error) {\n    authOk = false;\n  }\n}\nreturn { json: { ...$json, authOk } };"
+                                     },
+                      "id":  "ChecarBasicAuth",
+                      "name":  "Checar Acesso do Painel",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -20,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "AcessoValido",
+                                                                                   "leftValue":  "={{ $json.authOk }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "AcessoPermitido",
+                      "name":  "Acesso Permitido?",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2,
+                      "position":  [
+                                       220,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "text",
+                                         "responseBody":  "Acesso restrito ao painel.",
+                                         "options":  {
+                                                         "responseCode":  401,
+                                                         "responseHeaders":  {
+                                                                                 "entries":  [
+                                                                                                 {
+                                                                                                     "name":  "WWW-Authenticate",
+                                                                                                     "value":  "Basic realm=\"AtendeOS\""
+                                                                                                 }
+                                                                                             ]
+                                                                             }
+                                                     }
+                                     },
+                      "id":  "ResponderNaoAutorizado",
+                      "name":  "Responder Nao Autorizado",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       460,
+                                       160
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "Webhook - Dashboard UI":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "Checar Acesso do Painel",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   },
+                        "Checar Acesso do Painel":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "Acesso Permitido?",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "Acesso Permitido?":  {
+                                                  "main":  [
+                                                               [
+                                                                   {
+                                                                       "node":  "Responder HTML",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ],
+                                                               [
+                                                                   {
+                                                                       "node":  "Responder Nao Autorizado",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ]
+                                                           ]
+                                              }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 }
+}

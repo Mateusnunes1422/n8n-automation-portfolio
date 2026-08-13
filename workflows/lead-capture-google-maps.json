@@ -1,0 +1,654 @@
+﻿{
+    "name":  "Lead capture - Google Maps",
+    "nodes":  [
+                  {
+                      "parameters":  {
+
+                                     },
+                      "id":  "3d155293-6498-48fa-a8ba-7d8169fe71f9",
+                      "name":  "When clicking \"Execute Workflow\"",
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "position":  [
+                                       -560,
+                                       592
+                                   ],
+                      "typeVersion":  1
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://places.googleapis.com/v1/places:searchText",
+                                         "authentication":  "predefinedCredentialType",
+                                         "nodeCredentialType":  "googleOAuth2Api",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "X-Goog-FieldMask",
+                                                                                         "value":  "places.id,places.displayName,places.addressComponents,places.formattedAddress,places.primaryType,places.primaryTypeDisplayName,places.types,places.location,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.websiteUri,places.editorialSummary,places.reviews,places.attributions,places.userRatingCount"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "bodyParameters":  {
+                                                                "parameters":  [
+                                                                                   {
+                                                                                       "name":  "textQuery",
+                                                                                       "value":  "={{ $json.subcat }} {{ $json.city }} cep {{ $json.zip }}"
+                                                                                   }
+                                                                               ]
+                                                            },
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "fullResponse":  true
+                                                                                       }
+                                                                      }
+                                                     }
+                                     },
+                      "id":  "02e6d7c8-0899-4f88-9a8b-e783377096a5",
+                      "name":  "GMaps API",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "position":  [
+                                       160,
+                                       592
+                                   ],
+                      "typeVersion":  4.2
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  [
+                                                                                 {
+                                                                                     "id":  "758ff896-7cd8-4f72-bfbb-e64583c5937c",
+                                                                                     "name":  "places.id",
+                                                                                     "type":  "string",
+                                                                                     "value":  "={{ $json.place.id }}"
+                                                                                 }
+                                                                             ]
+                                                         },
+                                         "includeOtherFields":  true,
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "80f14bf9-9a0c-4652-b549-d37f1af58674",
+                      "name":  "Set Place ID",
+                      "type":  "n8n-nodes-base.set",
+                      "position":  [
+                                       912,
+                                       608
+                                   ],
+                      "typeVersion":  3.4
+                  },
+                  {
+                      "parameters":  {
+                                         "compare":  "selectedFields",
+                                         "fieldsToCompare":  "place.id,places.id",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "e185d7b7-b869-4ac3-9fdd-4fe0831da492",
+                      "name":  "Remove Duplicates",
+                      "type":  "n8n-nodes-base.removeDuplicates",
+                      "position":  [
+                                       1136,
+                                       608
+                                   ],
+                      "typeVersion":  1.1
+                  },
+                  {
+                      "parameters":  {
+                                         "assignments":  {
+                                                             "assignments":  [
+                                                                                 {
+                                                                                     "id":  "cc0502d5-b1d9-4a3c-bfe6-7ff0ed4830d7",
+                                                                                     "name":  "zip",
+                                                                                     "value":  "18000000",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "68b3490e-c32d-4c93-8703-b9f785075e0a",
+                                                                                     "name":  "subcat",
+                                                                                     "value":  "clinica odontologica",
+                                                                                     "type":  "string"
+                                                                                 },
+                                                                                 {
+                                                                                     "id":  "9c50af36-4c8c-4991-9b3a-031291101c6d",
+                                                                                     "name":  "city",
+                                                                                     "value":  "Sorocaba",
+                                                                                     "type":  "string"
+                                                                                 }
+                                                                             ]
+                                                         },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "9bcbf1c0-a596-41fb-a377-8f56017d708c",
+                      "name":  "Settings",
+                      "type":  "n8n-nodes-base.set",
+                      "position":  [
+                                       -208,
+                                       592
+                                   ],
+                      "typeVersion":  3.4
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "// Get the places array from the input data\nconst places = items[0]?.json?.body?.places || [];\n\n// Create an output array to hold each place as a separate item\nlet output = [];\n\nif (places.length \u003e 0) {\n  for (let i = 0; i \u003c places.length; i++) {\n    // For each place, push a new item into the output array\n    output.push({\n      json: {\n        place: places[i], // The individual place object\n        otherData: items[0].json.otherData || null  // Include other data or default to null\n      }\n    });\n  }\n} else {\n  // Log an error or handle the case where places array is empty or undefined\n  console.log(\u0027Places array is empty or undefined.\u0027);\n}\n\n// Return the output array, so each place becomes its own item\nreturn output;\n"
+                                     },
+                      "id":  "b474b40f-489f-4fcc-b371-8688d1253a07",
+                      "name":  "Place Array",
+                      "type":  "n8n-nodes-base.code",
+                      "position":  [
+                                       704,
+                                       608
+                                   ],
+                      "typeVersion":  2
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# SETTINGS",
+                                         "height":  311,
+                                         "width":  247,
+                                         "color":  5
+                                     },
+                      "id":  "96dc47e5-7cdb-4e30-98e0-db64ed870988",
+                      "name":  "Sticky Note8",
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "position":  [
+                                       -288,
+                                       496
+                                   ],
+                      "typeVersion":  1
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# ATIVAÇÃO\n",
+                                         "height":  327,
+                                         "width":  247,
+                                         "color":  4
+                                     },
+                      "id":  "1c0f4b0a-a059-4d90-913c-3c4087512990",
+                      "name":  "Sticky Note",
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "position":  [
+                                       -624,
+                                       480
+                                   ],
+                      "typeVersion":  1
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "# Google Maps API - Buscar Locais",
+                                         "height":  880,
+                                         "width":  1280,
+                                         "color":  5
+                                     },
+                      "id":  "c9403865-733f-465f-8465-7677249dc32e",
+                      "name":  "Sticky Note1",
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "position":  [
+                                       0,
+                                       0
+                                   ],
+                      "typeVersion":  1
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "version":  2,
+                                                                            "leftValue":  "",
+                                                                            "caseSensitive":  true,
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "combinator":  "and",
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "7424452f-e208-4e7e-8144-d0c6278bc0f0",
+                                                                                   "operator":  {
+                                                                                                    "type":  "object",
+                                                                                                    "operation":  "empty",
+                                                                                                    "singleValue":  true
+                                                                                                },
+                                                                                   "leftValue":  "={{ $json.body }}",
+                                                                                   "rightValue":  ""
+                                                                               }
+                                                                           ]
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "3b2e560e-bfb7-47ba-8800-aa1038d0e191",
+                      "name":  "If Empty",
+                      "type":  "n8n-nodes-base.if",
+                      "position":  [
+                                       432,
+                                       592
+                                   ],
+                      "typeVersion":  2.2
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "### ALTERAR CREDENCIAIS E ADICIONAR O SCOPE",
+                                         "height":  288,
+                                         "width":  316
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "position":  [
+                                       48,
+                                       464
+                                   ],
+                      "typeVersion":  1,
+                      "id":  "f69da1f3-81d0-49e6-af8b-92092977c26a",
+                      "name":  "Sticky Note16"
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "### 1 - ADICIONE O \"PLACES API\" NOS SEUS SERVIÇOS DAS CREDENCIAIS DO GOOGLE (https://console.cloud.google.com/marketplace/product/google/places-backend.googleapis.com)\n\n### 2- NO \"SCOPE\" DA CREDENCIAL OAUTH2 DA CHAMADA HTTP DO GOOGLE O LINK É ESTE: https://www.googleapis.com/auth/cloud-platform\n\n### AS OUTRAS CONFIGURAÇÕES VOCÊ DEVE COPIAR DAS CREDENCIAIS",
+                                         "height":  200,
+                                         "width":  1240
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "position":  [
+                                       32,
+                                       96
+                                   ],
+                      "typeVersion":  1,
+                      "id":  "3358db89-ed00-4b52-acb6-18893e35807a",
+                      "name":  "Sticky Note17"
+                  },
+                  {
+                      "parameters":  {
+                                         "model":  {
+                                                       "__rl":  true,
+                                                       "value":  "gpt-4o-mini",
+                                                       "mode":  "list",
+                                                       "cachedResultName":  "gpt-4o-mini"
+                                                   },
+                                         "options":  {
+                                                         "temperature":  0.2
+                                                     }
+                                     },
+                      "type":  "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       1888,
+                                       864
+                                   ],
+                      "id":  "0c602b60-5d0b-48d6-a896-832ea7c95bb5",
+                      "name":  "OpenAI Chat Model"
+                  },
+                  {
+                      "parameters":  {
+                                         "content":  "## Filtrando e Adicionando Leads no Supabase",
+                                         "height":  700,
+                                         "width":  860
+                                     },
+                      "type":  "n8n-nodes-base.stickyNote",
+                      "typeVersion":  1,
+                      "position":  [
+                                       1312,
+                                       176
+                                   ],
+                      "id":  "0c1363bc-dd97-452b-8875-d5c378c267be",
+                      "name":  "Sticky Note2"
+                  },
+                  {
+                      "parameters":  {
+                                         "promptType":  "define",
+                                         "text":  "={{ JSON.stringify($json.place) }}",
+                                         "options":  {
+                                                         "systemMessage":  "Filtre o payload recebido da API do Google Maps.\n\nRegistre os leads no banco de dados usando a tool \"Upsert Leads\"\n\nno campo review_summary, faça um resumo das reviews do estabelecimento, esse conhecimento será usado para o Outreach!\n\n"
+                                                     }
+                                     },
+                      "type":  "@n8n/n8n-nodes-langchain.agent",
+                      "typeVersion":  1.8,
+                      "position":  [
+                                       1888,
+                                       624
+                                   ],
+                      "id":  "e1d79a03-899a-4e2b-94f8-c17b70b16c0d",
+                      "name":  "AI Agent",
+                      "alwaysOutputData":  true
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "loose",
+                                                                            "version":  2
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "0497055a-9128-4d80-b054-dbffc492d94c",
+                                                                                   "leftValue":  "={{ $json.place.rating }}",
+                                                                                   "rightValue":  3,
+                                                                                   "operator":  {
+                                                                                                    "type":  "number",
+                                                                                                    "operation":  "gt"
+                                                                                                }
+                                                                               },
+                                                                               {
+                                                                                   "id":  "11229cb2-0f9f-4d8b-ae6a-d2d954c1383a",
+                                                                                   "leftValue":  "={{ $json.place.nationalPhoneNumber }}",
+                                                                                   "rightValue":  "",
+                                                                                   "operator":  {
+                                                                                                    "type":  "string",
+                                                                                                    "operation":  "exists",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               },
+                                                                               {
+                                                                                   "id":  "66848fb4-1372-4354-969a-9a947b3f3cd8",
+                                                                                   "leftValue":  "={{ $json.place.userRatingCount }}",
+                                                                                   "rightValue":  1,
+                                                                                   "operator":  {
+                                                                                                    "type":  "number",
+                                                                                                    "operation":  "gt"
+                                                                                                }
+                                                                               },
+                                                                               {
+                                                                                   "id":  "e2977f23-ab13-461a-8e5e-4c656cd22625",
+                                                                                   "leftValue":  "={{(() =\u003e {\n  const raw = $json.place.nationalPhoneNumber || \u0027\u0027;\n  const digitsOnly = raw.replace(/\\D/g, \u0027\u0027); // Remove parênteses, traços etc.\n  const phonePart = digitsOnly.slice(2); // Remove os dois primeiros dígitos (DDD)\n  return phonePart.startsWith(\u00279\u0027);\n})()}}",
+                                                                                   "rightValue":  "",
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "looseTypeValidation":  true,
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.filter",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       1376,
+                                       608
+                                   ],
+                      "id":  "3d38d2df-6340-4779-ab1f-90be888f7cec",
+                      "name":  "Filter"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "upsert",
+                                         "dataTableId":  {
+                                                             "__rl":  true,
+                                                             "value":  "jfk5JhIedAQfIMog",
+                                                             "mode":  "list",
+                                                             "cachedResultName":  "leads-captacao",
+                                                             "cachedResultUrl":  "/projects/X3i954d3Ptyo5kjY/datatables/nBTC8qo6dOJdNsMi"
+                                                         },
+                                         "matchType":  "allConditions",
+                                         "filters":  {
+                                                         "conditions":  [
+                                                                            {
+                                                                                "keyName":  "place_id",
+                                                                                "keyValue":  "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI(\u0027conditions0_Value\u0027, ``, \u0027string\u0027) }}"
+                                                                            }
+                                                                        ]
+                                                     },
+                                         "columns":  {
+                                                         "mappingMode":  "defineBelow",
+                                                         "value":  {
+                                                                       "type":  "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI(\u0027type\u0027, ``, \u0027string\u0027) }}",
+                                                                       "phone":  "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI(\u0027phone\u0027, ``, \u0027string\u0027) }}",
+                                                                       "address":  "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI(\u0027address\u0027, ``, \u0027string\u0027) }}",
+                                                                       "name":  "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI(\u0027name\u0027, ``, \u0027string\u0027) }}",
+                                                                       "place_id":  "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI(\u0027place_id\u0027, ``, \u0027string\u0027) }}",
+                                                                       "review_summary":  "={{ $fromAI(\u0027review_summary\u0027, \u0027resumo das reviews disponiveis\u0027, \u0027string\u0027) }}"
+                                                                   },
+                                                         "matchingColumns":  [
+
+                                                                             ],
+                                                         "schema":  [
+                                                                        {
+                                                                            "id":  "name",
+                                                                            "displayName":  "name",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "phone",
+                                                                            "displayName":  "phone",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "address",
+                                                                            "displayName":  "address",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "type",
+                                                                            "displayName":  "type",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "review_summary",
+                                                                            "displayName":  "review_summary",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        },
+                                                                        {
+                                                                            "id":  "place_id",
+                                                                            "displayName":  "place_id",
+                                                                            "required":  false,
+                                                                            "defaultMatch":  false,
+                                                                            "display":  true,
+                                                                            "type":  "string",
+                                                                            "readOnly":  false,
+                                                                            "removed":  false
+                                                                        }
+                                                                    ],
+                                                         "attemptToConvertTypes":  false,
+                                                         "convertFieldsToString":  false
+                                                     },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.dataTableTool",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       2032,
+                                       864
+                                   ],
+                      "id":  "4ea9b122-8ee4-472d-a93a-8abfa698fb1f",
+                      "name":  "Upsert Leads"
+                  },
+                  {
+                      "parameters":  {
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.splitInBatches",
+                      "typeVersion":  3,
+                      "position":  [
+                                       1616,
+                                       608
+                                   ],
+                      "id":  "f7bc5158-336e-4e8b-a5b9-37d464efe436",
+                      "name":  "Loop Over Items"
+                  }
+              ],
+    "connections":  {
+                        "If Empty":  {
+                                         "main":  [
+                                                      [
+
+                                                      ],
+                                                      [
+                                                          {
+                                                              "node":  "Place Array",
+                                                              "type":  "main",
+                                                              "index":  0
+                                                          }
+                                                      ]
+                                                  ]
+                                     },
+                        "Settings":  {
+                                         "main":  [
+                                                      [
+                                                          {
+                                                              "node":  "GMaps API",
+                                                              "type":  "main",
+                                                              "index":  0
+                                                          }
+                                                      ]
+                                                  ]
+                                     },
+                        "GMaps API":  {
+                                          "main":  [
+                                                       [
+                                                           {
+                                                               "node":  "If Empty",
+                                                               "type":  "main",
+                                                               "index":  0
+                                                           }
+                                                       ]
+                                                   ]
+                                      },
+                        "Place Array":  {
+                                            "main":  [
+                                                         [
+                                                             {
+                                                                 "node":  "Set Place ID",
+                                                                 "type":  "main",
+                                                                 "index":  0
+                                                             }
+                                                         ]
+                                                     ]
+                                        },
+                        "Set Place ID":  {
+                                             "main":  [
+                                                          [
+                                                              {
+                                                                  "node":  "Remove Duplicates",
+                                                                  "type":  "main",
+                                                                  "index":  0
+                                                              }
+                                                          ]
+                                                      ]
+                                         },
+                        "Remove Duplicates":  {
+                                                  "main":  [
+                                                               [
+                                                                   {
+                                                                       "node":  "Filter",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ]
+                                                           ]
+                                              },
+                        "When clicking \"Execute Workflow\"":  {
+                                                                   "main":  [
+                                                                                [
+                                                                                    {
+                                                                                        "node":  "Settings",
+                                                                                        "type":  "main",
+                                                                                        "index":  0
+                                                                                    }
+                                                                                ]
+                                                                            ]
+                                                               },
+                        "OpenAI Chat Model":  {
+                                                  "ai_languageModel":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "AI Agent",
+                                                                                   "type":  "ai_languageModel",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                              },
+                        "Filter":  {
+                                       "main":  [
+                                                    [
+                                                        {
+                                                            "node":  "Loop Over Items",
+                                                            "type":  "main",
+                                                            "index":  0
+                                                        }
+                                                    ]
+                                                ]
+                                   },
+                        "Upsert Leads":  {
+                                             "ai_tool":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "AI Agent",
+                                                                     "type":  "ai_tool",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                         },
+                        "Loop Over Items":  {
+                                                "main":  [
+                                                             [
+
+                                                             ],
+                                                             [
+                                                                 {
+                                                                     "node":  "AI Agent",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "AI Agent":  {
+                                         "main":  [
+                                                      [
+                                                          {
+                                                              "node":  "Loop Over Items",
+                                                              "type":  "main",
+                                                              "index":  0
+                                                          }
+                                                      ]
+                                                  ]
+                                     }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "availableInMCP":  false
+                 }
+}

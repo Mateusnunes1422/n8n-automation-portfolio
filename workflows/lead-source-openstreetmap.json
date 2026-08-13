@@ -1,0 +1,208 @@
+﻿{
+    "name":  "Lead source - OpenStreetMap",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "httpMethod":  "POST",
+                                         "path":  "coletar-prospeccao-osm",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "osm-webhook-001",
+                      "name":  "Receber filtros OSM",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -900,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "\nconst body = $json.body || $json;\nconst nicho = String(body.nicho || \u0027\u0027).trim();\nconst cidade = String(body.cidades || \u0027\u0027).split(\u0027;\u0027).map(c =\u003e c.trim()).filter(Boolean)[0] || \u0027\u0027;\nconst limite = Math.min(Math.max(Number(body.maxResultadosPorCidade || 20), 1), 50);\nconst prioridadeMinima = String(body.prioridadeMinima || \u0027Todas\u0027);\nif (!nicho) throw new Error(\u0027Informe um nicho.\u0027);\nif (!cidade) throw new Error(\u0027Informe pelo menos uma cidade.\u0027);\nreturn [{ json: { nicho, cidade, limite, prioridadeMinima, geoUrl: \u0027https://nominatim.openstreetmap.org/search?q=\u0027 + encodeURIComponent(cidade) + \u0027\u0026format=json\u0026limit=1\u0026countrycodes=br\u0027 } }];\n"
+                                     },
+                      "id":  "osm-prep-002",
+                      "name":  "Preparar consulta OSM",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -680,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{ $json.geoUrl }}",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "User-Agent",
+                                                                                         "value":  "n8n-lead-dashboard/1.0"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      }
+                                                     }
+                                     },
+                      "id":  "osm-geo-003",
+                      "name":  "Geocodificar cidade OSM",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       -450,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "\nconst original = $(\u0027Preparar consulta OSM\u0027).item.json;\nconst geo = Array.isArray($json) ? $json : ($json.lat ? [$json] : ($json.body || []));\nif (!Array.isArray(geo) || !geo.length) return [{ json:{ ...original, overpassUrl:\u0027https://overpass-api.de/api/interpreter?data=\u0027 + encodeURIComponent(\u0027[out:json][timeout:5];node(0,0,0,0);out;\u0027) } }];\nconst lat = Number(geo[0].lat), lon = Number(geo[0].lon);\nconst nicho = original.nicho.toLowerCase();\nconst radius = 25000;\nfunction clean(s){ return s.replace(/[\\\"\u0027]/g, \u0027\u0027).slice(0, 80); }\nfunction area(filter){ return \u0027node\u0027 + filter + \u0027(around:\u0027 + radius + \u0027,\u0027 + lat + \u0027,\u0027 + lon + \u0027);way\u0027 + filter + \u0027(around:\u0027 + radius + \u0027,\u0027 + lat + \u0027,\u0027 + lon + \u0027);\u0027; }\nlet filters = [];\nif (/barbear|barber|barbeiro|cabelo|salao|salão|cabeleireiro/.test(nicho)) {\n  filters = [\n    \u0027[\"shop\"=\"hairdresser\"]\u0027,\n    \u0027[\"craft\"=\"barber\"]\u0027\n  ];\n} else if (/dent|odonto/.test(nicho)) {\n  filters = [\u0027[\"amenity\"=\"dentist\"]\u0027,\u0027[\"healthcare\"=\"dentist\"]\u0027,\u0027[\"name\"~\"dent|odonto|sorriso|oral\",i]\u0027];\n} else if (/estet|beleza|beauty|spa/.test(nicho)) {\n  filters = [\u0027[\"shop\"=\"beauty\"]\u0027,\u0027[\"beauty\"]\u0027,\u0027[\"name\"~\"estet|estética|beleza|beauty|spa|skin\",i]\u0027];\n} else if (/pet|veterin/.test(nicho)) {\n  filters = [\u0027[\"shop\"=\"pet\"]\u0027,\u0027[\"amenity\"=\"veterinary\"]\u0027,\u0027[\"name\"~\"pet|veterin\",i]\u0027];\n} else if (/academ|fitness|gym/.test(nicho)) {\n  filters = [\u0027[\"leisure\"=\"fitness_centre\"]\u0027,\u0027[\"sport\"=\"fitness\"]\u0027,\u0027[\"name\"~\"academ|fitness|gym|treino\",i]\u0027];\n} else if (/restaurante|lanch|pizza|food/.test(nicho)) {\n  filters = [\u0027[\"amenity\"=\"restaurant\"]\u0027,\u0027[\"amenity\"=\"fast_food\"]\u0027,\u0027[\"name\"~\"restaurante|lanch|pizza|food\",i]\u0027];\n} else if (/farmacia|farmácia/.test(nicho)) {\n  filters = [\u0027[\"amenity\"=\"pharmacy\"]\u0027,\u0027[\"shop\"=\"chemist\"]\u0027,\u0027[\"name\"~\"farm\",i]\u0027];\n} else if (/oficina|mecan|auto/.test(nicho)) {\n  filters = [\u0027[\"shop\"=\"car_repair\"]\u0027,\u0027[\"craft\"=\"mechanic\"]\u0027,\u0027[\"name\"~\"oficina|mecan|auto\",i]\u0027];\n} else {\n  filters = [\u0027[\"name\"~\"\u0027 + clean(original.nicho) + \u0027\",i]\u0027];\n}\nconst union = filters.map(area).join(\u0027\u0027);\nconst query = \u0027[out:json][timeout:15];(\u0027 + union + \u0027);out center tags \u0027 + original.limite + \u0027;\u0027;\nreturn [{ json:{ ...original, overpassUrl:\u0027https://overpass-api.de/api/interpreter?data=\u0027 + encodeURIComponent(query) } }];\n"
+                                     },
+                      "id":  "osm-query-004",
+                      "name":  "Montar query Overpass",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -220,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{ $json.overpassUrl }}",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "User-Agent",
+                                                                                         "value":  "n8n-lead-dashboard/1.0"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      }
+                                                     }
+                                     },
+                      "id":  "osm-overpass-005",
+                      "name":  "Buscar dados no Overpass",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       20,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "\nconst original = $(\u0027Montar query Overpass\u0027).item.json;\nconst data = $json;\nconst elements = data.elements || [];\nconst peso = { Baixa:1, Media:2, Alta:3 };\nconst seen = new Set();\nconst leads = [];\nfor (const el of elements) {\n  const tags = el.tags || {};\n  const name = tags.name || tags.brand || \u0027\u0027;\n  if (!name) continue;\n  const phone = tags.phone || tags[\u0027contact:phone\u0027] || tags[\u0027contact:mobile\u0027] || \u0027\u0027;\n  const site = tags.website || tags[\u0027contact:website\u0027] || tags.url || \u0027\u0027;\n  const lat = el.lat || el.center?.lat || \u0027\u0027;\n  const lon = el.lon || el.center?.lon || \u0027\u0027;\n  const endereco = [tags[\u0027addr:street\u0027], tags[\u0027addr:housenumber\u0027], tags[\u0027addr:suburb\u0027], tags[\u0027addr:city\u0027]].filter(Boolean).join(\u0027, \u0027);\n  const atividadeCompat = tags.shop || tags.amenity || tags.craft || tags.healthcare || tags.leisure || tags.tourism || tags.beauty || tags.hairdresser;\n  const score = (atividadeCompat ? 35 : 0) + (phone ? 25 : 0) + (site ? 10 : 0) + (endereco ? 15 : 0) + (lat \u0026\u0026 lon ? 15 : 0);\n  const prioridade = score \u003e= 70 ? \u0027Alta\u0027 : score \u003e= 40 ? \u0027Media\u0027 : \u0027Baixa\u0027;\n  if (original.prioridadeMinima !== \u0027Todas\u0027 \u0026\u0026 peso[prioridade] \u003c peso[original.prioridadeMinima]) continue;\n  const key = (name + \u0027|\u0027 + original.cidade + \u0027|\u0027 + endereco).toLowerCase();\n  if (seen.has(key)) continue;\n  seen.add(key);\n  leads.push({ nicho:original.nicho, cidadeBusca:original.cidade, nomeEmpresa:name, telefone:phone, endereco, site, semSite:!site, rating:\u0027\u0027, quantidadeAvaliacoes:\u0027\u0027, latitude:lat, longitude:lon, googleMaps: lat \u0026\u0026 lon ? \u0027https://www.google.com/maps/search/?api=1\u0026query=\u0027 + lat + \u0027,\u0027 + lon : \u0027\u0027, osmUrl:\u0027https://www.openstreetmap.org/\u0027 + el.type + \u0027/\u0027 + el.id, prioridade, scoreProspeccao:score, origem:\u0027OpenStreetMap Overpass API\u0027, coletadoEm:new Date().toISOString() });\n}\nleads.sort((a,b) =\u003e b.scoreProspeccao - a.scoreProspeccao);\nreturn [{ json:{ success:true, total:leads.length, leads } }];\n"
+                                     },
+                      "id":  "osm-normalize-006",
+                      "name":  "Normalizar leads OSM",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       260,
+                                       120
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={{ $json }}",
+                                         "options":  {
+                                                         "responseCode":  200
+                                                     }
+                                     },
+                      "id":  "osm-response-007",
+                      "name":  "Responder leads OSM",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       500,
+                                       120
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "Receber filtros OSM":  {
+                                                    "main":  [
+                                                                 [
+                                                                     {
+                                                                         "node":  "Preparar consulta OSM",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ]
+                                                             ]
+                                                },
+                        "Preparar consulta OSM":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "Geocodificar cidade OSM",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "Geocodificar cidade OSM":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "Montar query Overpass",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "Montar query Overpass":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "Buscar dados no Overpass",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "Buscar dados no Overpass":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "Normalizar leads OSM",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "Normalizar leads OSM":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "Responder leads OSM",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 }
+}

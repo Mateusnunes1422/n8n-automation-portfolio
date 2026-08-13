@@ -1,0 +1,133 @@
+﻿{
+    "name":  "Self-healing integration monitor",
+    "nodes":  [
+                  {
+                      "id":  "mon_cron",
+                      "name":  "Cron Monitor",
+                      "type":  "n8n-nodes-base.scheduleTrigger",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       200,
+                                       300
+                                   ],
+                      "parameters":  {
+                                         "rule":  {
+                                                      "interval":  [
+                                                                       {
+                                                                           "field":  "minutes",
+                                                                           "minutesInterval":  10
+                                                                       }
+                                                                   ]
+                                                  }
+                                     }
+                  },
+                  {
+                      "id":  "mon_code",
+                      "name":  "Checar e Alertar",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       440,
+                                       300
+                                   ],
+                      "parameters":  {
+                                         "jsCode":  "const KEY_EVO = \u0027f7aaaba7593506765800c7d58133007a\u0027;\nconst INSTANCE = \u0027secretaria-clinica\u0027;\nconst TG_TOKEN = \u00278934272933:AAGq-Gfro0Ia-KiK8dEc3MK8YCPuORqC40Y\u0027;\nconst TG_CHAT = \u00275711916728\u0027;\nconst QR_URL = \u0027https://<REDACTED_PRIVATE_HOST>/webhook/secretaria-qr\u0027;\nconst https = require(\u0027https\u0027);\n\nfunction getState(){\n  return new Promise((resolve)=\u003e{\n    const req = https.request({ hostname:\<REDACTED_PRIVATE_HOST>\u0027, path:\u0027/instance/connectionState/\u0027+INSTANCE, method:\u0027GET\u0027, headers:{ \u0027apikey\u0027:KEY_EVO } }, (res)=\u003e{ let d=\u0027\u0027; res.on(\u0027data\u0027,c=\u003ed+=c); res.on(\u0027end\u0027,()=\u003e{ try{ const j=JSON.parse(d); resolve((j.instance \u0026\u0026 j.instance.state) || \u0027unknown\u0027); }catch(e){ resolve(\u0027parse-error\u0027); } }); });\n    req.on(\u0027error\u0027,()=\u003eresolve(\u0027req-error\u0027));\n    req.setTimeout(15000,()=\u003e{ req.destroy(); resolve(\u0027timeout\u0027); });\n    req.end();\n  });\n}\n\nfunction restart(){\n  return new Promise((resolve)=\u003e{\n    const req = https.request({ hostname:\<REDACTED_PRIVATE_HOST>\u0027, path:\u0027/instance/restart/\u0027+INSTANCE, method:\u0027POST\u0027, headers:{ \u0027apikey\u0027:KEY_EVO } }, (res)=\u003e{ let d=\u0027\u0027; res.on(\u0027data\u0027,c=\u003ed+=c); res.on(\u0027end\u0027,()=\u003eresolve(res.statusCode)); });\n    req.on(\u0027error\u0027,()=\u003eresolve(0));\n    req.setTimeout(15000,()=\u003e{ req.destroy(); resolve(0); });\n    req.end();\n  });\n}\n\nfunction tg(text){\n  return new Promise((resolve)=\u003e{\n    const payload = JSON.stringify({ chat_id: TG_CHAT, text: text, disable_web_page_preview: true });\n    const req = https.request({ hostname:\u0027api.telegram.org\u0027, path:\u0027/bot\u0027+TG_TOKEN+\u0027/sendMessage\u0027, method:\u0027POST\u0027, headers:{ \u0027Content-Type\u0027:\u0027application/json\u0027, \u0027Content-Length\u0027:Buffer.byteLength(payload) } }, (res)=\u003e{ let d=\u0027\u0027; res.on(\u0027data\u0027,c=\u003ed+=c); res.on(\u0027end\u0027,()=\u003eresolve(res.statusCode)); });\n    req.on(\u0027error\u0027,()=\u003eresolve(0));\n    req.setTimeout(15000,()=\u003e{ req.destroy(); resolve(0); });\n    req.write(payload); req.end();\n  });\n}\n\nconst s = $getWorkflowStaticData(\u0027global\u0027);\nconst st = await getState();\nconst up = (st === \u0027open\u0027);\nlet action = \u0027none\u0027;\n\nif (up) {\n  s.downCount = 0;\n  if (s.downAlerted) {\n    const mins = s.downSince ? Math.round((Date.now() - s.downSince)/60000) : 0;\n    await tg(\u0027🟢 SECRETARIA IA VOLTOU\\n\\nInstancia reconectada. Ficou fora ~\u0027 + mins + \u0027 min. Atendimento normal.\u0027);\n    s.downAlerted = false; s.qrSent = false; action = \u0027recovered\u0027;\n  }\n} else {\n  s.downCount = (s.downCount || 0) + 1;\n  if (s.downCount === 2) {\n    const rc = await restart();\n    s.downAlerted = true; s.downSince = s.downSince || Date.now();\n    await tg(\u0027🔴 SECRETARIA IA CAIU (estado: \u0027 + st + \u0027).\\n\\nTentando reconectar sozinho (restart \u0027 + rc + \u0027)... Se nao voltar, te mando o QR no proximo aviso.\u0027);\n    action = \u0027restart-try\u0027;\n  } else if (s.downCount \u003e= 3 \u0026\u0026 !s.qrSent) {\n    await tg(\u0027🔴 NAO reconectou sozinho.\\n\\nReligue escaneando o QR aqui:\\n\u0027 + QR_URL + \u0027\\n\\nNo celular do numero: WhatsApp \u003e Aparelhos conectados \u003e Conectar um aparelho. A pagina atualiza o QR sozinha.\u0027);\n    s.qrSent = true; action = \u0027qr-sent\u0027;\n  }\n}\n\nreturn [{ json:{ state: st, up, downCount: s.downCount || 0, alerted: s.downAlerted || false, action, at: new Date().toISOString() } }];\n"
+                                     }
+                  },
+                  {
+                      "id":  "qr_wh",
+                      "name":  "QR Webhook",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2,
+                      "position":  [
+                                       200,
+                                       540
+                                   ],
+                      "onError":  "continueRegularOutput",
+                      "parameters":  {
+                                         "httpMethod":  "GET",
+                                         "path":  "secretaria-qr",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+
+                                                     }
+                                     }
+                  },
+                  {
+                      "id":  "qr_gen",
+                      "name":  "Gerar QR",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       440,
+                                       540
+                                   ],
+                      "parameters":  {
+                                         "jsCode":  "const KEY_EVO = \u0027f7aaaba7593506765800c7d58133007a\u0027;\nconst INSTANCE = \u0027secretaria-clinica\u0027;\nconst https = require(\u0027https\u0027);\nfunction connect(){\n  return new Promise((resolve)=\u003e{\n    const req = https.request({ hostname:\<REDACTED_PRIVATE_HOST>\u0027, path:\u0027/instance/connect/\u0027+INSTANCE, method:\u0027GET\u0027, headers:{ \u0027apikey\u0027:KEY_EVO } }, (res)=\u003e{ let d=\u0027\u0027; res.on(\u0027data\u0027,c=\u003ed+=c); res.on(\u0027end\u0027,()=\u003e{ try{ resolve(JSON.parse(d)); }catch(e){ resolve({}); } }); });\n    req.on(\u0027error\u0027,()=\u003eresolve({}));\n    req.setTimeout(15000,()=\u003e{ req.destroy(); resolve({}); });\n    req.end();\n  });\n}\nconst r = await connect();\nconst b64 = r.base64 || (r.qrcode \u0026\u0026 r.qrcode.base64) || \u0027\u0027;\nconst pairing = r.pairingCode || (r.qrcode \u0026\u0026 r.qrcode.pairingCode) || \u0027\u0027;\nconst state = (r.instance \u0026\u0026 r.instance.state) || \u0027\u0027;\nlet html;\nif (b64) {\n  html = \u0027\u003c!doctype html\u003e\u003chtml\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta name=\"viewport\" content=\"width=device-width,initial-scale=1\"\u003e\u003cmeta http-equiv=\"refresh\" content=\"25\"\u003e\u003ctitle\u003eReconectar Secretaria IA\u003c/title\u003e\u003cstyle\u003ebody{font-family:system-ui,sans-serif;text-align:center;background:#0e0e12;color:#eee;padding:24px;margin:0}h2{margin:8px 0}img{width:300px;max-width:86vw;background:#fff;padding:12px;border-radius:14px;margin:14px 0}.p{color:#9aa;font-size:14px}\u003c/style\u003e\u003c/head\u003e\u003cbody\u003e\u003ch2\u003eReconectar Secretaria IA\u003c/h2\u003e\u003cdiv class=\"p\"\u003eNo celular do numero: \u003cb\u003eWhatsApp \u0026gt; Aparelhos conectados \u0026gt; Conectar um aparelho\u003c/b\u003e e aponte a camera aqui.\u003c/div\u003e\u003cimg src=\"\u0027 + b64 + \u0027\"/\u003e\u0027 + (pairing ? \u0027\u003cdiv class=\"p\"\u003eou codigo: \u003cb\u003e\u0027 + pairing + \u0027\u003c/b\u003e\u003c/div\u003e\u0027 : \u0027\u0027) + \u0027\u003cdiv class=\"p\"\u003eO QR atualiza sozinho a cada 25s.\u003c/div\u003e\u003c/body\u003e\u003c/html\u003e\u0027;\n} else if (state === \u0027open\u0027) {\n  html = \u0027\u003c!doctype html\u003e\u003chtml\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003ctitle\u003eConectada\u003c/title\u003e\u003c/head\u003e\u003cbody style=\"font-family:system-ui;text-align:center;padding:48px;background:#0e0e12;color:#7CFC00\"\u003e\u003ch2\u003e✅ Secretaria ja esta conectada\u003c/h2\u003e\u003cp style=\"color:#9aa\"\u003eNao precisa fazer nada.\u003c/p\u003e\u003c/body\u003e\u003c/html\u003e\u0027;\n} else {\n  html = \u0027\u003c!doctype html\u003e\u003chtml\u003e\u003chead\u003e\u003cmeta charset=\"utf-8\"\u003e\u003cmeta http-equiv=\"refresh\" content=\"10\"\u003e\u003ctitle\u003eAguarde\u003c/title\u003e\u003c/head\u003e\u003cbody style=\"font-family:system-ui;text-align:center;padding:48px;background:#0e0e12;color:#eee\"\u003e\u003ch2\u003eGerando QR...\u003c/h2\u003e\u003cp style=\"color:#9aa\"\u003eEstado: \u0027 + (state||\u0027—\u0027) + \u0027. Recarregando em 10s.\u003c/p\u003e\u003c/body\u003e\u003c/html\u003e\u0027;\n}\nreturn [{ json:{ html } }];\n"
+                                     }
+                  },
+                  {
+                      "id":  "qr_resp",
+                      "name":  "Responder QR",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       680,
+                                       540
+                                   ],
+                      "parameters":  {
+                                         "respondWith":  "text",
+                                         "responseBody":  "={{ $json.html }}",
+                                         "options":  {
+                                                         "responseHeaders":  {
+                                                                                 "entries":  [
+                                                                                                 {
+                                                                                                     "name":  "Content-Type",
+                                                                                                     "value":  "text/html; charset=utf-8"
+                                                                                                 }
+                                                                                             ]
+                                                                             }
+                                                     }
+                                     }
+                  }
+              ],
+    "connections":  {
+                        "Cron Monitor":  {
+                                             "main":  [
+                                                          [
+                                                              {
+                                                                  "node":  "Checar e Alertar",
+                                                                  "type":  "main",
+                                                                  "index":  0
+                                                              }
+                                                          ]
+                                                      ]
+                                         },
+                        "QR Webhook":  {
+                                           "main":  [
+                                                        [
+                                                            {
+                                                                "node":  "Gerar QR",
+                                                                "type":  "main",
+                                                                "index":  0
+                                                            }
+                                                        ]
+                                                    ]
+                                       },
+                        "Gerar QR":  {
+                                         "main":  [
+                                                      [
+                                                          {
+                                                              "node":  "Responder QR",
+                                                              "type":  "main",
+                                                              "index":  0
+                                                          }
+                                                      ]
+                                                  ]
+                                     }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "timezone":  "America/Sao_Paulo"
+                 }
+}

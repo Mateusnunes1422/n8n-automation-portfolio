@@ -1,0 +1,227 @@
+﻿{
+    "name":  "Support dashboard - actions",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "httpMethod":  "POST",
+                                         "path":  "dashboard-atendimento-action-painel-05f4a1785bc3458c",
+                                         "responseMode":  "responseNode",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "WebhookDashboardAction",
+                      "name":  "Webhook - Dashboard Acoes",
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -500,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const body = $json.body ?? $json;\nreturn { json: { payload: { business_slug: \u0027doceria-padaria-modelo\u0027, ...body } } };"
+                                     },
+                      "id":  "PrepararPayload",
+                      "name":  "Preparar Payload",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -260,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "https://<REDACTED_PRIVATE_HOST>/rest/v1/rpc/dashboard_action",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "apikey",
+                                                                                         "value":  "<REDACTED_JWT>"
+                                                                                     },
+                                                                                     {
+                                                                                         "name":  "Authorization",
+                                                                                         "value":  "Bearer <REDACTED_JWT>"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "contentType":  "json",
+                                         "jsonBody":  "={{ { payload: $json.payload } }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "ExecutarAcaoSupabase",
+                      "name":  "Executar Acao Supabase",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.2,
+                      "position":  [
+                                       -20,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "json",
+                                         "responseBody":  "={{ $json }}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "ResponderJson",
+                      "name":  "Responder JSON",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       220,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const headers = $json.headers || {};\nconst auth = headers.authorization || headers.Authorization || \u0027\u0027;\nlet authOk = false;\nif (auth.startsWith(\u0027Basic \u0027)) {\n  try {\n    const decoded = Buffer.from(auth.slice(6), \u0027base64\u0027).toString(\u0027utf8\u0027);\n    authOk = decoded === \u0027admin:ma1210151\u0027;\n  } catch (error) {\n    authOk = false;\n  }\n}\nreturn { json: { ...$json, authOk } };"
+                                     },
+                      "id":  "ChecarBasicAuth",
+                      "name":  "Checar Acesso do Painel",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -260,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict"
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "AcessoValido",
+                                                                                   "leftValue":  "={{ $json.authOk }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "AcessoPermitido",
+                      "name":  "Acesso Permitido?",
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -20,
+                                       0
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "respondWith":  "text",
+                                         "responseBody":  "Acesso restrito ao painel.",
+                                         "options":  {
+                                                         "responseCode":  401,
+                                                         "responseHeaders":  {
+                                                                                 "entries":  [
+                                                                                                 {
+                                                                                                     "name":  "WWW-Authenticate",
+                                                                                                     "value":  "Basic realm=\"AtendeOS\""
+                                                                                                 }
+                                                                                             ]
+                                                                             }
+                                                     }
+                                     },
+                      "id":  "ResponderNaoAutorizado",
+                      "name":  "Responder Nao Autorizado",
+                      "type":  "n8n-nodes-base.respondToWebhook",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       220,
+                                       160
+                                   ]
+                  }
+              ],
+    "connections":  {
+                        "Webhook - Dashboard Acoes":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  "Checar Acesso do Painel",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      },
+                        "Preparar Payload":  {
+                                                 "main":  [
+                                                              [
+                                                                  {
+                                                                      "node":  "Executar Acao Supabase",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ]
+                                                          ]
+                                             },
+                        "Executar Acao Supabase":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "Responder JSON",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   },
+                        "Checar Acesso do Painel":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "Acesso Permitido?",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "Acesso Permitido?":  {
+                                                  "main":  [
+                                                               [
+                                                                   {
+                                                                       "node":  "Preparar Payload",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ],
+                                                               [
+                                                                   {
+                                                                       "node":  "Responder Nao Autorizado",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ]
+                                                           ]
+                                              }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1"
+                 }
+}

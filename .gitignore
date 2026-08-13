@@ -1,0 +1,20 @@
+# Nunca versionar exports crus do n8n — eles contem staticData, credenciais e
+# dados pessoais. Só entram os arquivos ja sanitizados em workflows/.
+*.raw.json
+raw/
+**/wf_original*.json
+**/*_payload.json
+
+# Segredos
+.env
+.env.*
+*.pem
+*.key
+.secrets/
+credentials*.json
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+node_modules/
