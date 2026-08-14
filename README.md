@@ -25,6 +25,22 @@ is a live secret.
 | [self-healing-monitor](workflows/self-healing-monitor.json) | 5 | Polls a live integration, attempts automatic recovery when the connection drops, and escalates to an operator with a self-refreshing reconnection page only when it can't self-heal. |
 | [clinic-ai-assistant](workflows/clinic-ai-assistant.json) | 4 | WhatsApp AI assistant: intent classification, per-contact conversation memory, qualification, booking capture, and automatic handoff to a human. |
 
+## Write-ups
+
+Each of these covers the problem, the approach, and the design decisions that
+only became obvious after something broke in production.
+
+- **[WhatsApp AI Assistant with Human Handoff](docs/whatsapp-ai-assistant.md)** —
+  why the bot has to go *silent* when it escalates, and what happens when it
+  doesn't.
+- **[Multi-Tenant Scheduling SaaS](docs/multi-tenant-saas.md)** — provisioning a
+  complete isolated tenant from a signup, and three things that only fail inside
+  AI agent sub-nodes.
+- **[Lead Discovery & Enrichment Pipeline](docs/lead-pipeline.md)** — free
+  sources that don't violate anyone's terms, and the honest verification rate.
+- **[Self-Healing Integration Monitoring](docs/self-healing-monitor.md)** —
+  tolerate, self-heal, then escalate with a one-click fix.
+
 ## Two design decisions worth reading the code for
 
 **Human handoff with a silence window** — in `clinic-ai-assistant`, when the
