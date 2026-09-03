@@ -1,0 +1,1584 @@
+{
+  "name": "CRM de Disparo - Revenda Multi-Cliente",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "# CRM de Disparo - Revenda Multi-Cliente\n\nCamada de revenda sobre o dispatcher de compliance. Um unico deploy atende\nvarios clientes pagantes, cada um com suas listas, campanhas e creditos.\n\nBlocos deste workflow:\n- SETUP - cria o schema multi-tenant\n- FUNIL - recebe leads do trafego pago (Meta / Google Ads)\n- ONBOARDING - converte lead em cliente e credita o plano\n- LISTAS - importa contatos EXIGINDO origem de consentimento\n- DISPATCHER - dispara por cliente, com rate limit e debito de credito\n- INBOUND - respostas, opt-out por cliente e supressao global\n- PAINEL - saldo e metricas por cliente\n\nMANTENHA DESATIVADO ate configurar Postgres, provider e as variaveis de ambiente.\n\nVariaveis usadas:\nCRM_API_KEY, GRAPH_API_VERSION, WA_PHONE_NUMBER_ID, META_ACCESS_TOKEN,\nGATEWAY_BASE_URL, GATEWAY_API_KEY, ALERTA_WEBHOOK",
+        "height": 480,
+        "width": 820,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        -2100
+      ],
+      "id": "7785fb20-2634-8779-d6fc-c2e1281fb7ed",
+      "name": "README GERAL - CRM de Disparo (Revenda)"
+    },
+    {
+      "parameters": {
+        "content": "# SETUP\n\nExecute manualmente UMA vez, com a credencial Postgres ja conectada.\n\nNao envia mensagem nenhuma. Apenas cria as tabelas: clientes, leads de\ntrafego, listas com prova de consentimento, contatos, opt-outs (por cliente\ne globais), templates, campanhas, disparos, respostas, movimentos de credito,\nmetricas e logs.",
+        "height": 300,
+        "width": 620,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        -1560
+      ],
+      "id": "b32f7026-ffb3-78a5-13e1-e386b76b02c0",
+      "name": "SETUP - README"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        -1180
+      ],
+      "id": "96a3be3c-f272-e017-046d-1b2674a52bd3",
+      "name": "01 - Trigger Setup"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "create extension if not exists pgcrypto;\n\n-- Empresas que compram o servico de disparo\ncreate table if not exists clientes (\n  id uuid primary key default gen_random_uuid(),\n  nome_empresa text not null,\n  responsavel text,\n  email text,\n  telefone_e164 text,\n  plano text not null default 'starter',\n  status text not null default 'trial',\n  creditos_saldo int not null default 0,\n  limite_diario int not null default 200,\n  limite_hora int not null default 30,\n  janela_inicio int not null default 9,\n  janela_fim int not null default 20,\n  provider text not null default 'cloud_api',\n  provider_config jsonb not null default '{}'::jsonb,\n  criado_em timestamptz default now()\n);\ncreate unique index if not exists clientes_email_unique\n  on clientes (lower(email)) where email is not null;\n\n-- Leads captados pelo trafego pago (ainda nao sao clientes)\ncreate table if not exists leads_trafego (\n  id uuid primary key default gen_random_uuid(),\n  nome text,\n  email text,\n  telefone_e164 text,\n  empresa text,\n  nicho text,\n  volume_mensal int,\n  origem text,\n  campanha_ads text,\n  conjunto_ads text,\n  anuncio_ads text,\n  utm jsonb not null default '{}'::jsonb,\n  score int default 0,\n  temperatura text default 'frio',\n  status text default 'novo',\n  cliente_id uuid references clientes(id),\n  criado_em timestamptz default now(),\n  atualizado_em timestamptz default now()\n);\ncreate unique index if not exists leads_trafego_tel_unique\n  on leads_trafego (telefone_e164) where telefone_e164 is not null;\n\n-- Toda lista carrega a origem do consentimento. Sem isso nao entra.\ncreate table if not exists listas (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid not null references clientes(id),\n  nome text not null,\n  origem_consentimento text not null,\n  texto_consentimento text not null,\n  data_coleta date,\n  responsavel_declaracao text not null,\n  total_importado int default 0,\n  total_rejeitado int default 0,\n  criado_em timestamptz default now()\n);\n\ncreate table if not exists contatos (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid not null references clientes(id),\n  lista_id uuid references listas(id),\n  telefone_e164 text not null,\n  nome text,\n  campos jsonb not null default '{}'::jsonb,\n  status text default 'active',\n  ultimo_inbound_em timestamptz,\n  criado_em timestamptz default now(),\n  unique (cliente_id, telefone_e164)\n);\n\n-- cliente_id nulo = supressao global, vale para todos os clientes\ncreate table if not exists opt_outs (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid references clientes(id),\n  telefone_e164 text not null,\n  palavra text,\n  origem text default 'whatsapp',\n  criado_em timestamptz default now()\n);\ncreate unique index if not exists opt_outs_escopo_unique on opt_outs\n  (coalesce(cliente_id, '00000000-0000-0000-0000-000000000000'::uuid), telefone_e164);\ncreate index if not exists opt_outs_tel_idx on opt_outs (telefone_e164);\n\ncreate table if not exists templates (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid not null references clientes(id),\n  nome_meta text not null,\n  idioma text default 'pt_BR',\n  categoria text,\n  status text default 'pending',\n  corpo text,\n  criado_em timestamptz default now()\n);\n\ncreate table if not exists campanhas (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid not null references clientes(id),\n  lista_id uuid references listas(id),\n  template_id uuid references templates(id),\n  nome text not null,\n  status text default 'draft',\n  start_at timestamptz,\n  end_at timestamptz,\n  criado_em timestamptz default now()\n);\n\ncreate table if not exists disparos (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid not null references clientes(id),\n  campanha_id uuid references campanhas(id),\n  contato_id uuid references contatos(id),\n  telefone_e164 text not null,\n  provider text,\n  message_id text,\n  status text default 'queued',\n  payload jsonb,\n  erro jsonb,\n  sent_at timestamptz, delivered_at timestamptz, read_at timestamptz, failed_at timestamptz,\n  criado_em timestamptz default now(),\n  unique (campanha_id, contato_id)\n);\ncreate index if not exists disparos_cliente_sent_idx on disparos (cliente_id, sent_at);\n\ncreate table if not exists respostas (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid references clientes(id),\n  contato_id uuid references contatos(id),\n  telefone_e164 text,\n  message_id text,\n  texto text,\n  payload jsonb,\n  recebido_em timestamptz default now()\n);\n\n-- Razao de creditos. Toda entrada e saida de saldo passa por aqui.\ncreate table if not exists creditos_movimentos (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid not null references clientes(id),\n  tipo text not null,\n  quantidade int not null,\n  saldo_apos int,\n  referencia text,\n  disparo_id uuid references disparos(id),\n  criado_em timestamptz default now()\n);\ncreate index if not exists creditos_cliente_idx on creditos_movimentos (cliente_id, criado_em);\n\ncreate table if not exists metricas_campanha (\n  campanha_id uuid primary key references campanhas(id),\n  cliente_id uuid references clientes(id),\n  enviados int default 0, entregues int default 0, lidos int default 0,\n  respostas int default 0, falhas int default 0, opt_outs int default 0,\n  taxa_entrega numeric, taxa_leitura numeric, taxa_falha numeric, taxa_opt_out numeric,\n  atualizado_em timestamptz default now()\n);\n\ncreate table if not exists logs_erros (\n  id uuid primary key default gen_random_uuid(),\n  cliente_id uuid,\n  contexto text,\n  erro jsonb,\n  criado_em timestamptz default now()\n);",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1160,
+        -1180
+      ],
+      "id": "b33f759d-6285-4c6b-25e3-76467da1053b",
+      "name": "02 - Criar Schema Revenda"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "39dc653b-9014-b8c2-6156-426ec0eaa872",
+              "name": "status",
+              "type": "string",
+              "value": "Schema multi-tenant criado. Cadastre um cliente pelo bloco ONBOARDING antes de qualquer disparo."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -920,
+        -1180
+      ],
+      "id": "e45ee7ce-7e88-149a-f8dd-32b27f9512ce",
+      "name": "03 - Resultado Setup"
+    },
+    {
+      "parameters": {
+        "content": "# FUNIL - Trafego Pago\n\nEndpoint da landing page do anuncio. Recebe o lead, normaliza telefone,\nguarda UTM / campanha / conjunto / anuncio e calcula um score simples\n(volume mensal declarado + nicho + dados de contato completos).\n\nPOST /webhook/crm-disparo/lead\nHeader: x-api-key: $env.CRM_API_KEY\n\nBody: nome, email, telefone, empresa, nicho, volume_mensal,\n      utm_source, utm_medium, utm_campaign, campanha_ads,\n      conjunto_ads, anuncio_ads\n\nO score define a temperatura e a ordem da fila de contato comercial.",
+        "height": 400,
+        "width": 660,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        -800
+      ],
+      "id": "f9031ab8-b259-7b47-ff44-74d1665869f0",
+      "name": "FUNIL - README"
+    },
+    {
+      "parameters": {
+        "path": "crm-disparo/lead",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1400,
+        -320
+      ],
+      "id": "a49a425f-54ec-b93e-5dbb-5c19eacb605b",
+      "name": "04 - Webhook Lead Anuncio"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst headers = $json.headers || {};\nconst authOk = String(headers['x-api-key'] || '') === String($env.CRM_API_KEY || '');\n\nfunction tel(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  if (!d) return '';\n  if (d.length === 10 || d.length === 11) return '55' + d;\n  if (d.length === 12 || d.length === 13) return d;\n  return d;\n}\n\nconst telefone = tel(body.telefone || body.phone);\nconst email = String(body.email || '').trim().toLowerCase();\nconst nome = String(body.nome || body.name || '').trim();\nconst empresa = String(body.empresa || '').trim();\nconst nicho = String(body.nicho || '').trim();\nconst volume = Math.max(0, Number(body.volume_mensal || 0));\n\nconst telefoneValido = /^55\\d{10,11}$/.test(telefone);\nconst emailValido = /^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email);\n\nlet score = 0;\nif (telefoneValido) score += 25;\nif (emailValido) score += 15;\nif (empresa) score += 10;\nif (nicho) score += 10;\nif (volume >= 50000) score += 40;\nelse if (volume >= 10000) score += 30;\nelse if (volume >= 1000) score += 20;\nelse if (volume > 0) score += 10;\n\nconst temperatura = score >= 70 ? 'quente' : score >= 45 ? 'morno' : 'frio';\nconst valido = authOk && (telefoneValido || emailValido) && Boolean(nome);\n\nreturn [{ json: {\n  authOk, valido, nome, email, telefone_e164: telefoneValido ? telefone : null,\n  empresa, nicho, volume_mensal: volume, score, temperatura,\n  origem: String(body.utm_source || body.origem || 'ads'),\n  campanha_ads: String(body.campanha_ads || body.utm_campaign || ''),\n  conjunto_ads: String(body.conjunto_ads || ''),\n  anuncio_ads: String(body.anuncio_ads || ''),\n  utm: {\n    source: body.utm_source || null, medium: body.utm_medium || null,\n    campaign: body.utm_campaign || null, content: body.utm_content || null,\n    term: body.utm_term || null\n  },\n  motivo: !authOk ? 'api_key_invalida'\n        : !nome ? 'nome_ausente'\n        : (!telefoneValido && !emailValido) ? 'contato_invalido' : null\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1160,
+        -320
+      ],
+      "id": "1be7b79c-e23e-eeef-7f80-67f25e01ddfc",
+      "name": "05 - Normalizar e Pontuar Lead"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "37fee6b0-8656-a005-14a5-e06967c5f542",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -920,
+        -320
+      ],
+      "id": "539dcf0b-c839-783a-5e73-19f1a61f9d92",
+      "name": "06 - Lead Valido?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into leads_trafego\n  (nome, email, telefone_e164, empresa, nicho, volume_mensal, origem,\n   campanha_ads, conjunto_ads, anuncio_ads, utm, score, temperatura)\nvalues ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13)\non conflict (telefone_e164) where telefone_e164 is not null\ndo update set\n  nome = excluded.nome, email = excluded.email, empresa = excluded.empresa,\n  nicho = excluded.nicho, volume_mensal = excluded.volume_mensal,\n  score = excluded.score, temperatura = excluded.temperatura,\n  campanha_ads = excluded.campanha_ads, utm = excluded.utm,\n  atualizado_em = now()\nreturning id, score, temperatura, status;",
+        "options": {
+          "queryReplacement": "={{ [$json.nome, $json.email, $json.telefone_e164, $json.empresa, $json.nicho, $json.volume_mensal, $json.origem, $json.campanha_ads, $json.conjunto_ads, $json.anuncio_ads, JSON.stringify($json.utm), $json.score, $json.temperatura] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -680,
+        -420
+      ],
+      "id": "e7226645-d371-34b7-732a-7aee19548c1b",
+      "name": "07 - Gravar Lead do Trafego"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, lead_id: $json.id, score: $json.score, temperatura: $json.temperatura } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -440,
+        -420
+      ],
+      "id": "24fbaa28-c712-f1df-7ad0-8041e8b8ebb6",
+      "name": "08 - Responder Lead Aceito"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, motivo: $json.motivo } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -680,
+        -180
+      ],
+      "id": "acacfd51-f81d-0c95-6b37-0e287a7a79dc",
+      "name": "09 - Responder Lead Recusado"
+    },
+    {
+      "parameters": {
+        "content": "# ONBOARDING - Lead vira Cliente\n\nChamado quando o lead fecha. Cria o cliente, aplica os limites do plano e\ncredita o pacote contratado no razao de creditos.\n\nPOST /webhook/crm-disparo/cliente/ativar\nHeader: x-api-key: $env.CRM_API_KEY\nBody: lead_id (opcional), nome_empresa, responsavel, email, telefone,\n      plano (starter|pro|scale), provider (cloud_api|gateway),\n      provider_config { instancia, numero_id }\n\nPlanos definem creditos iniciais e os limites de hora / dia. Cliente nasce\ncom status 'trial' ate o pagamento ser confirmado no seu meio de cobranca.",
+        "height": 400,
+        "width": 660,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        120
+      ],
+      "id": "37c4275f-e4a2-e1a8-8eda-8df806cafbe4",
+      "name": "ONBOARDING - README"
+    },
+    {
+      "parameters": {
+        "path": "crm-disparo/cliente/ativar",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1400,
+        600
+      ],
+      "id": "3b015f8d-1604-d495-9d4b-5ed2bb9489a8",
+      "name": "10 - Webhook Ativar Cliente"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst headers = $json.headers || {};\nconst authOk = String(headers['x-api-key'] || '') === String($env.CRM_API_KEY || '');\n\nconst PLANOS = {\n  starter: { creditos: 5000,  limite_dia: 500,   limite_hora: 60  },\n  pro:     { creditos: 20000, limite_dia: 2000,  limite_hora: 200 },\n  scale:   { creditos: 60000, limite_dia: 6000,  limite_hora: 500 }\n};\n\nconst plano = String(body.plano || 'starter').toLowerCase();\nconst cfg = PLANOS[plano];\nconst nomeEmpresa = String(body.nome_empresa || '').trim();\nconst email = String(body.email || '').trim().toLowerCase();\nconst provider = String(body.provider || 'cloud_api');\n\nfunction tel(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  if (d.length === 10 || d.length === 11) return '55' + d;\n  return d;\n}\n\nconst valido = authOk && Boolean(cfg) && Boolean(nomeEmpresa) &&\n               ['cloud_api', 'gateway'].includes(provider);\n\nreturn [{ json: {\n  authOk, valido, plano, nome_empresa: nomeEmpresa,\n  responsavel: String(body.responsavel || ''), email,\n  telefone_e164: tel(body.telefone), provider,\n  provider_config: body.provider_config || {},\n  lead_id: body.lead_id || null,\n  creditos: cfg ? cfg.creditos : 0,\n  limite_diario: cfg ? cfg.limite_dia : 0,\n  limite_hora: cfg ? cfg.limite_hora : 0,\n  janela_inicio: Number(body.janela_inicio ?? 9),\n  janela_fim: Number(body.janela_fim ?? 20),\n  motivo: !authOk ? 'api_key_invalida'\n        : !cfg ? 'plano_invalido'\n        : !nomeEmpresa ? 'nome_empresa_ausente'\n        : 'provider_invalido'\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1160,
+        600
+      ],
+      "id": "9a1b08bf-9408-441d-6a74-8186b042ff9e",
+      "name": "11 - Aplicar Plano e Limites"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "e124c395-0129-668a-6a96-9aaa6d549537",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -920,
+        600
+      ],
+      "id": "b1858f0b-b237-87e0-b6fa-b8570273279b",
+      "name": "12 - Ativacao Valida?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with novo as (\n  insert into clientes\n    (nome_empresa, responsavel, email, telefone_e164, plano, status,\n     creditos_saldo, limite_diario, limite_hora, janela_inicio, janela_fim,\n     provider, provider_config)\n  values ($1,$2,$3,$4,$5,'trial',$6,$7,$8,$9,$10,$11,$12::jsonb)\n  returning id, nome_empresa, plano, status, creditos_saldo\n), mov as (\n  insert into creditos_movimentos (cliente_id, tipo, quantidade, saldo_apos, referencia)\n  select id, 'credito_plano', $6, creditos_saldo, 'ativacao_plano_' || $5 from novo\n), lead as (\n  update leads_trafego\n     set status = 'convertido', cliente_id = (select id from novo), atualizado_em = now()\n   where id = nullif($13,'')::uuid\n)\nselect * from novo;",
+        "options": {
+          "queryReplacement": "={{ [$json.nome_empresa, $json.responsavel, $json.email, $json.telefone_e164, $json.plano, $json.creditos, $json.limite_diario, $json.limite_hora, $json.janela_inicio, $json.janela_fim, $json.provider, JSON.stringify($json.provider_config), $json.lead_id || ''] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -680,
+        500
+      ],
+      "id": "b171f7a8-0fb1-d229-b706-0a47732f0ca4",
+      "name": "13 - Criar Cliente e Creditar Plano"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, cliente_id: $json.id, plano: $json.plano, creditos: $json.creditos_saldo, status: $json.status } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -440,
+        500
+      ],
+      "id": "5bf12f9f-4e3c-5faa-aca0-68dd875f7d3c",
+      "name": "14 - Responder Ativacao"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, motivo: $json.motivo } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -680,
+        740
+      ],
+      "id": "b1db5deb-4111-cb9d-f2c4-00961320f97d",
+      "name": "15 - Responder Ativacao Recusada"
+    },
+    {
+      "parameters": {
+        "content": "# LISTAS - Importacao com Prova de Consentimento\n\nEste e o bloco que separa um servico de disparo de um spam cannon.\n\nA lista SO entra se o cliente declarar, junto do arquivo:\n- origem_consentimento  (formulario_site, checkout, opt_in_whatsapp, evento...)\n- texto_consentimento   (o texto exato que a pessoa aceitou)\n- data_coleta\n- responsavel_declaracao (quem assina a declaracao)\n\nSem os quatro campos a requisicao volta 422 e nada e gravado.\n\nContatos ja em opt-out (do proprio cliente ou na supressao global) sao\ndescartados na importacao, nao no disparo.\n\nPOST /webhook/crm-disparo/lista/importar",
+        "height": 440,
+        "width": 660,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1400,
+        1040
+      ],
+      "id": "8d7ad52d-a3f0-f3c4-f1e1-41f897f8070d",
+      "name": "LISTAS - README"
+    },
+    {
+      "parameters": {
+        "path": "crm-disparo/lista/importar",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1400,
+        1560
+      ],
+      "id": "2118ec2a-5422-4e0b-a525-a2d6c3040856",
+      "name": "16 - Webhook Importar Lista"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst headers = $json.headers || {};\nconst authOk = String(headers['x-api-key'] || '') === String($env.CRM_API_KEY || '');\n\nconst clienteId = String(body.cliente_id || '').trim();\nconst origem = String(body.origem_consentimento || '').trim();\nconst texto = String(body.texto_consentimento || '').trim();\nconst dataColeta = String(body.data_coleta || '').trim();\nconst responsavel = String(body.responsavel_declaracao || '').trim();\n\nconst ORIGENS = ['formulario_site','checkout','opt_in_whatsapp','evento','cadastro_loja','app'];\n\n// Consentimento e obrigatorio e a origem precisa ser uma das declaradas.\nconst consentimentoOk =\n  ORIGENS.includes(origem) && texto.length >= 20 &&\n  /^\\d{4}-\\d{2}-\\d{2}$/.test(dataColeta) && responsavel.length >= 3;\n\nconst uuidOk = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clienteId);\n\nfunction tel(v) {\n  const d = String(v || '').replace(/\\D/g, '');\n  if (d.length === 10 || d.length === 11) return '55' + d;\n  if (d.length === 12 || d.length === 13) return d;\n  return '';\n}\n\nconst brutos = Array.isArray(body.contatos) ? body.contatos : [];\nconst vistos = new Set();\nconst contatos = [];\nlet rejeitados = 0;\n\nfor (const c of brutos) {\n  const telefone = tel(c.telefone || c.phone || c.numero);\n  if (!/^55\\d{10,11}$/.test(telefone) || vistos.has(telefone)) { rejeitados++; continue; }\n  vistos.add(telefone);\n  const { telefone: _t, phone: _p, numero: _n, nome: _nm, name: _na, ...extras } = c;\n  contatos.push({\n    telefone_e164: telefone,\n    nome: String(c.nome || c.name || '').trim() || null,\n    campos: extras\n  });\n}\n\nconst valido = authOk && uuidOk && consentimentoOk && contatos.length > 0;\n\nreturn [{ json: {\n  authOk, valido, cliente_id: clienteId,\n  nome_lista: String(body.nome_lista || 'Lista sem nome').trim(),\n  origem_consentimento: origem, texto_consentimento: texto,\n  data_coleta: dataColeta || null, responsavel_declaracao: responsavel,\n  contatos, total_recebido: brutos.length,\n  total_valido: contatos.length, total_rejeitado: rejeitados,\n  motivo: !authOk ? 'api_key_invalida'\n        : !uuidOk ? 'cliente_id_invalido'\n        : !consentimentoOk ? 'prova_de_consentimento_incompleta'\n        : 'nenhum_contato_valido'\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1160,
+        1560
+      ],
+      "id": "83304bcb-297e-9d29-dac3-59cee1b54b84",
+      "name": "17 - Exigir Consentimento e Normalizar"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "41054ec3-0dd2-5bc8-0fbc-d189023c399b",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -920,
+        1560
+      ],
+      "id": "2af19806-1572-4fa4-16e0-59d465ccc363",
+      "name": "18 - Consentimento Declarado?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Os totais sao calculados ANTES do insert da lista: CTEs que alteram\n-- dados nao enxergam o efeito umas das outras na mesma tabela, entao um\n-- \"update listas\" aqui dentro nunca acharia a linha recem inserida.\nwith entrada as (\n  select\n    (c->>'telefone_e164')  as telefone_e164,\n    (c->>'nome')           as nome,\n    coalesce(c->'campos', '{}'::jsonb) as campos\n  from jsonb_array_elements($8::jsonb) as c\n), limpos as (\n  -- descarta quem ja pediu para sair, deste cliente ou globalmente\n  select e.* from entrada e\n  where not exists (\n    select 1 from opt_outs o\n     where o.telefone_e164 = e.telefone_e164\n       and (o.cliente_id is null or o.cliente_id = $1::uuid)\n  )\n), lista as (\n  insert into listas\n    (cliente_id, nome, origem_consentimento, texto_consentimento,\n     data_coleta, responsavel_declaracao, total_importado, total_rejeitado)\n  values ($1::uuid, $2, $3, $4, nullif($5,'')::date, $6,\n          (select count(*) from limpos), $7)\n  returning id\n), inseridos as (\n  insert into contatos (cliente_id, lista_id, telefone_e164, nome, campos)\n  select $1::uuid, (select id from lista), l.telefone_e164, l.nome, l.campos\n    from limpos l\n  on conflict (cliente_id, telefone_e164) do update\n     set lista_id = excluded.lista_id,\n         nome = coalesce(excluded.nome, contatos.nome),\n         campos = contatos.campos || excluded.campos\n  returning id\n)\nselect (select id from lista) as lista_id,\n       (select count(*) from inseridos) as total_importado,\n       $7::int as total_rejeitado,\n       (select count(*) from entrada) - (select count(*) from limpos)\n         as suprimidos_opt_out;",
+        "options": {
+          "queryReplacement": "={{ [$json.cliente_id, $json.nome_lista, $json.origem_consentimento, $json.texto_consentimento, $json.data_coleta || '', $json.responsavel_declaracao, $json.total_rejeitado, JSON.stringify($json.contatos)] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -680,
+        1460
+      ],
+      "id": "ae26df3a-adc5-c122-a0ff-d959f7b3ae02",
+      "name": "19 - Gravar Lista e Contatos"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, lista_id: $json.lista_id, importados: $json.total_importado, invalidos: $json.total_rejeitado, suprimidos_opt_out: $json.suprimidos_opt_out } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -440,
+        1460
+      ],
+      "id": "e582a6e1-1070-079b-bcf7-d2389b60545c",
+      "name": "20 - Responder Importacao"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, motivo: $json.motivo, exigido: ['origem_consentimento','texto_consentimento','data_coleta','responsavel_declaracao'] } }}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -680,
+        1700
+      ],
+      "id": "231cd117-3b9e-4cbd-078e-d2fc34e10e53",
+      "name": "21 - Recusar Lista Sem Consentimento"
+    },
+    {
+      "parameters": {
+        "content": "# DISPATCHER - Multi-Cliente\n\nRoda a cada 10 minutos. Para cada campanha ativa:\n\n1. verifica janela horaria e status do CLIENTE (nao so da campanha)\n2. pega o proximo contato sem opt-out e sem disparo previo\n3. checa limite/hora, limite/dia e SALDO DE CREDITO\n4. espaca o envio\n5. envia pelo provider do cliente (Cloud API oficial ou gateway)\n6. registra o disparo, debita 1 credito no razao e atualiza metricas\n7. pausa a campanha sozinha se a qualidade cair\n\nO debito de credito e o registro do disparo acontecem na MESMA transacao.\nSem isso voce entrega mensagem sem cobrar, ou cobra sem entregar.",
+        "height": 460,
+        "width": 700,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -2100
+      ],
+      "id": "2f693314-42c1-00ea-7a0b-fa93e510ccac",
+      "name": "DISPATCHER - README"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -300,
+        -1560
+      ],
+      "id": "b6d767d2-f8ed-5d21-a44b-0e5886680cb9",
+      "name": "22 - Agendador Disparo"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        -1380
+      ],
+      "id": "37693cfc-7480-49e4-5d87-b8c7d8b9aacd",
+      "name": "23 - Trigger Manual Teste"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  c.id as campanha_id, c.nome as campanha_nome, c.lista_id, c.template_id,\n  cl.id as cliente_id, cl.nome_empresa, cl.creditos_saldo,\n  cl.limite_diario, cl.limite_hora, cl.janela_inicio, cl.janela_fim,\n  cl.provider, cl.provider_config,\n  t.nome_meta, t.idioma, t.corpo, t.status as template_status\nfrom campanhas c\njoin clientes cl on cl.id = c.cliente_id\nleft join templates t on t.id = c.template_id\nwhere c.status = 'active'\n  and cl.status in ('trial','ativo')\n  and cl.creditos_saldo > 0\n  and now() between coalesce(c.start_at, now() - interval '1 day')\n                and coalesce(c.end_at,   now() + interval '1 day')\norder by c.criado_em asc\nlimit 5;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -60,
+        -1470
+      ],
+      "id": "ec4e17a1-ac74-ea62-07aa-d58820882401",
+      "name": "24 - Buscar Campanhas Elegiveis"
+    },
+    {
+      "parameters": {
+        "jsCode": "const hora = Number($now.setZone('America/Sao_Paulo').toFormat('H'));\n\nreturn items.map(item => {\n  const c = item.json;\n  const inicio = Number(c.janela_inicio ?? 9);\n  const fim = Number(c.janela_fim ?? 20);\n  const naJanela = hora >= inicio && hora < fim;\n  const temSaldo = Number(c.creditos_saldo || 0) > 0;\n  const templateOk = c.provider === 'gateway'\n    ? Boolean(c.corpo)\n    : (Boolean(c.nome_meta) && c.template_status === 'approved');\n\n  const podeOperar = naJanela && temSaldo && templateOk;\n\n  return { json: { ...c, hora, naJanela, temSaldo, templateOk, podeOperar,\n    bloqueio: podeOperar ? null\n      : !naJanela ? 'fora_da_janela'\n      : !temSaldo ? 'sem_credito'\n      : 'template_invalido' } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        -1470
+      ],
+      "id": "a82150e4-0588-9e92-0f13-7a0dce6bc2d2",
+      "name": "25 - Guardrails Cliente e Janela"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "6a474a12-39fb-62e3-cf18-3f3e6d756096",
+              "leftValue": "={{ $json.podeOperar }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        420,
+        -1470
+      ],
+      "id": "ef3b7391-4c6b-ea26-445b-cc2ce2ec9ba9",
+      "name": "26 - Pode Operar Agora?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select ct.id as contato_id, ct.telefone_e164, ct.nome, ct.campos\nfrom contatos ct\nwhere ct.cliente_id = $1::uuid\n  and ct.status = 'active'\n  and ($2 = '' or ct.lista_id = nullif($2,'')::uuid)\n  and not exists (\n    select 1 from opt_outs o\n     where o.telefone_e164 = ct.telefone_e164\n       and (o.cliente_id is null or o.cliente_id = ct.cliente_id)\n  )\n  and not exists (\n    select 1 from disparos d\n     where d.campanha_id = $3::uuid and d.contato_id = ct.id\n  )\norder by ct.criado_em asc\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{ [$json.cliente_id, $json.lista_id || '', $json.campanha_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        -1570
+      ],
+      "id": "17dd0d75-2caf-4f38-2297-13211ae89a9e",
+      "name": "27 - Proximo Contato Elegivel"
+    },
+    {
+      "parameters": {
+        "jsCode": "const campanha = $('25 - Guardrails Cliente e Janela').first().json;\nconst contato = $json.contato_id ? $json : null;\n\nif (!contato) {\n  return [{ json: { temContato: false, bloqueio: 'campanha_sem_contatos_restantes',\n                    cliente_id: campanha.cliente_id, campanha_id: campanha.campanha_id } }];\n}\n\nconst primeiroNome = String(contato.nome || 'cliente').split(' ')[0];\nconst cfg = campanha.provider_config || {};\nconst RODAPE = '\\n\\nResponda SAIR para nao receber mais mensagens.';\n\nlet url, headers, body;\n\nif (campanha.provider === 'cloud_api') {\n  const versao = $env.GRAPH_API_VERSION || 'v23.0';\n  const numeroId = cfg.numero_id || $env.WA_PHONE_NUMBER_ID;\n  url = 'https://graph.facebook.com/' + versao + '/' + numeroId + '/messages';\n  headers = {\n    Authorization: 'Bearer ' + (cfg.token || $env.META_ACCESS_TOKEN),\n    'Content-Type': 'application/json'\n  };\n  // No Cloud API o opt-out vive no proprio template aprovado, com botao.\n  body = {\n    messaging_product: 'whatsapp',\n    to: contato.telefone_e164,\n    type: 'template',\n    template: {\n      name: campanha.nome_meta,\n      language: { code: campanha.idioma || 'pt_BR' },\n      components: [{ type: 'body', parameters: [{ type: 'text', text: primeiroNome }] }]\n    }\n  };\n} else {\n  // Gateway generico (Evolution e compativeis). O rodape de opt-out\n  // e injetado aqui porque nao existe template aprovado para carrega-lo.\n  const base = String(cfg.base_url || $env.GATEWAY_BASE_URL || '').replace(/\\/+$/, '');\n  const instancia = cfg.instancia || 'default';\n  const texto = String(campanha.corpo || '')\n    .replace(/\\{\\{\\s*nome\\s*\\}\\}/g, primeiroNome) + RODAPE;\n  url = base + '/message/sendText/' + instancia;\n  headers = { apikey: cfg.api_key || $env.GATEWAY_API_KEY, 'Content-Type': 'application/json' };\n  body = { number: contato.telefone_e164, text: texto };\n}\n\nreturn [{ json: {\n  temContato: true,\n  cliente_id: campanha.cliente_id,\n  campanha_id: campanha.campanha_id,\n  contato_id: contato.contato_id,\n  telefone_e164: contato.telefone_e164,\n  provider: campanha.provider,\n  limite_hora: campanha.limite_hora,\n  limite_diario: campanha.limite_diario,\n  provider_url: url, provider_headers: headers, provider_body: body\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        -1570
+      ],
+      "id": "ed10644e-5bf9-9a36-f3c4-93a0d2e74348",
+      "name": "28 - Montar Mensagem e Requisicao"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "55b12d4d-0c45-c9ed-fa58-0d457818ba64",
+              "leftValue": "={{ $json.temContato }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1140,
+        -1570
+      ],
+      "id": "896888dd-9f86-7fe4-698d-fc791c29dd83",
+      "name": "29 - Tem Contato?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  (select count(*) from disparos d\n    where d.cliente_id = $1::uuid\n      and d.status in ('sent','delivered','read')\n      and d.sent_at >= now() - interval '1 hour') as enviados_hora,\n  (select count(*) from disparos d\n    where d.cliente_id = $1::uuid\n      and d.status in ('sent','delivered','read')\n      and d.sent_at::date = now()::date) as enviados_dia,\n  (select creditos_saldo from clientes where id = $1::uuid) as saldo;",
+        "options": {
+          "queryReplacement": "={{ [$json.cliente_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1380,
+        -1670
+      ],
+      "id": "3bf48f44-944b-0782-f857-47aa3aee0744",
+      "name": "30 - Checar Volume e Saldo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('28 - Montar Mensagem e Requisicao').first().json;\nconst v = $json || {};\n\nconst enviadosHora = Number(v.enviados_hora || 0);\nconst enviadosDia = Number(v.enviados_dia || 0);\nconst saldo = Number(v.saldo || 0);\nconst limiteHora = Number(ctx.limite_hora || 60);\nconst limiteDia = Number(ctx.limite_diario || 500);\n\nconst liberado = saldo > 0 && enviadosHora < limiteHora && enviadosDia < limiteDia;\n\nreturn [{ json: { ...ctx,\n  volume: { enviadosHora, enviadosDia, limiteHora, limiteDia, saldo },\n  liberado,\n  bloqueio: liberado ? null\n    : saldo <= 0 ? 'sem_credito'\n    : enviadosHora >= limiteHora ? 'limite_hora'\n    : 'limite_dia' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        -1670
+      ],
+      "id": "046b10ed-12dc-2d2e-f99e-32622d35c8a2",
+      "name": "31 - Decidir Envio"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "a9293f23-1a20-59d2-ea8c-7f992dd1a334",
+              "leftValue": "={{ $json.liberado }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1860,
+        -1670
+      ],
+      "id": "3d78bc35-4a4a-abcc-367c-fb5a92b1c2f2",
+      "name": "32 - Liberado para Enviar?"
+    },
+    {
+      "parameters": {
+        "amount": 45,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2100,
+        -1770
+      ],
+      "id": "182be0c5-cdcd-5072-bb18-64cdee4d3d6e",
+      "name": "33 - Espacamento Entre Envios"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.provider_url }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ JSON.stringify($json.provider_headers) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.provider_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "neverError": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2340,
+        -1770
+      ],
+      "id": "e369853d-f766-fa44-e1ed-0ff613f563bd",
+      "name": "34 - Enviar pelo Provider do Cliente",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('31 - Decidir Envio').first().json;\nconst r = $json || {};\n\n// Cloud API devolve messages[0].id. Gateways variam: key.id, id, message_id.\nconst messageId =\n  r.messages?.[0]?.id || r.key?.id || r.id || r.message_id || r.messageId || null;\n\nconst erro = r.error || r.erro || (r.status >= 400 ? r : null);\nconst ok = Boolean(messageId) && !erro;\n\nreturn [{ json: { ...ctx,\n  ok, message_id: messageId,\n  status: ok ? 'sent' : 'failed',\n  retorno: r,\n  erro: erro || null } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2580,
+        -1770
+      ],
+      "id": "182c93e2-c549-98f4-2e98-0dc601aea3f2",
+      "name": "35 - Interpretar Retorno do Provider"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Disparo e debito na mesma transacao: nunca entrega sem cobrar,\n-- nunca cobra sem registrar.\nwith novo as (\n  insert into disparos\n    (cliente_id, campanha_id, contato_id, telefone_e164, provider,\n     message_id, status, payload, erro, sent_at, failed_at)\n  values ($1::uuid, $2::uuid, $3::uuid, $4, $5, nullif($6,''), $7,\n          $8::jsonb, nullif($9,'')::jsonb,\n          case when $7 = 'sent' then now() end,\n          case when $7 = 'failed' then now() end)\n  on conflict (campanha_id, contato_id) do nothing\n  returning id, cliente_id, status\n), debito as (\n  update clientes c\n     set creditos_saldo = c.creditos_saldo - 1\n    from novo n\n   where c.id = n.cliente_id and n.status = 'sent'\n  returning c.id, c.creditos_saldo\n)\ninsert into creditos_movimentos\n  (cliente_id, tipo, quantidade, saldo_apos, referencia, disparo_id)\nselect d.id, 'debito_disparo', -1, d.creditos_saldo, 'campanha_' || $2, n.id\n  from debito d join novo n on n.cliente_id = d.id\nreturning cliente_id, saldo_apos;",
+        "options": {
+          "queryReplacement": "={{ [$json.cliente_id, $json.campanha_id, $json.contato_id, $json.telefone_e164, $json.provider, $json.message_id || '', $json.status, JSON.stringify($json.retorno || {}), $json.erro ? JSON.stringify($json.erro) : ''] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2820,
+        -1770
+      ],
+      "id": "e30744bc-d4ac-2172-943c-b33eb25c5381",
+      "name": "36 - Registrar Disparo e Debitar Credito"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into metricas_campanha\n  (campanha_id, cliente_id, enviados, entregues, lidos, respostas, falhas, opt_outs,\n   taxa_entrega, taxa_leitura, taxa_falha, taxa_opt_out, atualizado_em)\nselect\n  d.campanha_id, d.cliente_id,\n  count(*),\n  count(*) filter (where d.status in ('delivered','read')),\n  count(*) filter (where d.status = 'read'),\n  (select count(*) from respostas r\n    where r.contato_id in (select contato_id from disparos where campanha_id = $1::uuid)),\n  count(*) filter (where d.status = 'failed'),\n  (select count(*) from opt_outs o\n    where o.telefone_e164 in (select telefone_e164 from disparos where campanha_id = $1::uuid)),\n  round((count(*) filter (where d.status in ('delivered','read'))::numeric\n         / nullif(count(*),0)) * 100, 2),\n  round((count(*) filter (where d.status = 'read')::numeric\n         / nullif(count(*),0)) * 100, 2),\n  round((count(*) filter (where d.status = 'failed')::numeric\n         / nullif(count(*),0)) * 100, 2),\n  round(((select count(*) from opt_outs o\n           where o.telefone_e164 in (select telefone_e164 from disparos where campanha_id = $1::uuid))::numeric\n         / nullif(count(*),0)) * 100, 2),\n  now()\nfrom disparos d\nwhere d.campanha_id = $1::uuid\ngroup by d.campanha_id, d.cliente_id\non conflict (campanha_id) do update set\n  enviados = excluded.enviados, entregues = excluded.entregues,\n  lidos = excluded.lidos, respostas = excluded.respostas,\n  falhas = excluded.falhas, opt_outs = excluded.opt_outs,\n  taxa_entrega = excluded.taxa_entrega, taxa_leitura = excluded.taxa_leitura,\n  taxa_falha = excluded.taxa_falha, taxa_opt_out = excluded.taxa_opt_out,\n  atualizado_em = now();",
+        "options": {
+          "queryReplacement": "={{ [$('31 - Decidir Envio').first().json.campanha_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3060,
+        -1770
+      ],
+      "id": "4abf05f3-9533-0b83-e336-93a4794512c1",
+      "name": "37 - Atualizar Metricas da Campanha"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update campanhas c\n   set status = 'paused_auto'\n  from metricas_campanha m\n where m.campanha_id = c.id\n   and c.id = $1::uuid\n   and m.enviados >= 50\n   and (coalesce(m.taxa_falha, 0) > 8\n     or coalesce(m.taxa_entrega, 100) < 85\n     or coalesce(m.taxa_opt_out, 0) > 1.5)\nreturning c.id, c.nome, c.status;",
+        "options": {
+          "queryReplacement": "={{ [$('31 - Decidir Envio').first().json.campanha_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3300,
+        -1770
+      ],
+      "id": "1e75be17-e585-9cdd-9f2a-7fe4efda520c",
+      "name": "38 - Pausar Campanha se Qualidade Cair"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into logs_erros (cliente_id, contexto, erro)\nvalues (nullif($1,'')::uuid, $2, $3::jsonb);",
+        "options": {
+          "queryReplacement": "={{ [$json.cliente_id || '', 'dispatcher_bloqueado_' + ($json.bloqueio || 'desconhecido'), JSON.stringify($json)] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1620,
+        -1270
+      ],
+      "id": "04aa47e2-ad45-bb65-8261-a884bfbf16fc",
+      "name": "LOG - Bloqueio no Dispatcher"
+    },
+    {
+      "parameters": {
+        "content": "# INBOUND - Respostas e Opt-out\n\nUm endpoint so, aceitando payload do Cloud API e de gateway.\n\nPalavras de saida: sair, parar, cancelar, remover, descadastrar, stop.\n\nO opt-out e gravado com o cliente_id resolvido pelo ultimo disparo daquele\nnumero. Se o texto contiver denuncia explicita (spam, denunciar, procon,\nadvogado), a supressao vira GLOBAL - cliente_id nulo - e aquele numero\npara de receber de todos os clientes da plataforma.\n\nPOST /webhook/crm-disparo/inbound",
+        "height": 400,
+        "width": 660,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        120
+      ],
+      "id": "7cee6765-b7d6-b5aa-a1c1-4ffc3ebfa0d5",
+      "name": "INBOUND - README"
+    },
+    {
+      "parameters": {
+        "path": "crm-disparo/inbound",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -300,
+        600
+      ],
+      "id": "47f239e5-6c24-a41a-9ffc-9894ecf77d38",
+      "name": "39 - Webhook Inbound"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json;\nconst saidas = [];\n\n// Formato Meta Cloud API\nfor (const entry of body.entry || []) {\n  for (const change of entry.changes || []) {\n    for (const msg of (change.value || {}).messages || []) {\n      saidas.push({\n        telefone_e164: msg.from,\n        message_id: msg.id,\n        texto: msg.text?.body || msg.button?.text\n             || msg.interactive?.button_reply?.title || ''\n      });\n    }\n  }\n}\n\n// Formato gateway (Evolution e compativeis)\nif (!saidas.length && (body.data || body.message)) {\n  const d = body.data || body;\n  const jid = d.key?.remoteJid || d.from || '';\n  if (!d.key?.fromMe && jid && !jid.includes('@g.us')) {\n    saidas.push({\n      telefone_e164: String(jid).split('@')[0].replace(/\\D/g, ''),\n      message_id: d.key?.id || d.id || null,\n      texto: d.message?.conversation\n          || d.message?.extendedTextMessage?.text\n          || d.text || ''\n    });\n  }\n}\n\nif (!saidas.length) return [{ json: { ignorado: true, isOptOut: false } }];\n\nconst SAIDA = ['sair','parar','cancelar','remover','descadastrar','stop','pare'];\nconst DENUNCIA = ['spam','denunciar','denuncia','procon','advogado','processar'];\n\nreturn saidas.map(s => {\n  const limpo = String(s.texto || '')\n    .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '')\n    .toLowerCase().replace(/[^a-z\\s]/g, '').trim();\n  const palavras = limpo.split(/\\s+/);\n\n  const isOptOut = SAIDA.some(p => palavras.includes(p));\n  const isDenuncia = DENUNCIA.some(p => limpo.includes(p));\n\n  return { json: { ...s, ignorado: false, isOptOut: isOptOut || isDenuncia,\n    isDenuncia, palavra: palavras.find(p => SAIDA.includes(p)) || (isDenuncia ? 'denuncia' : null),\n    payload: body } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -60,
+        600
+      ],
+      "id": "af911edd-e838-6d7d-61ab-241502561f98",
+      "name": "40 - Extrair Mensagem e Classificar"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with alvo as (\n  -- resolve o cliente pelo disparo mais recente para este numero\n  select d.cliente_id, d.contato_id\n    from disparos d\n   where d.telefone_e164 = $1\n   order by d.sent_at desc nulls last\n   limit 1\n)\ninsert into respostas (cliente_id, contato_id, telefone_e164, message_id, texto, payload)\nselect a.cliente_id, a.contato_id, $1, nullif($2,''), $3, $4::jsonb from alvo a\nunion all\nselect null, null, $1, nullif($2,''), $3, $4::jsonb\n where not exists (select 1 from alvo)\nreturning cliente_id;",
+        "options": {
+          "queryReplacement": "={{ [$json.telefone_e164, $json.message_id || '', $json.texto || '', JSON.stringify($json.payload || {})] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        180,
+        600
+      ],
+      "id": "ddf99f26-e50f-b96b-5206-5dea1828c5ab",
+      "name": "41 - Registrar Resposta"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "2a98752d-7621-f24a-5d10-d13af5b7444e",
+              "leftValue": "={{ $('40 - Extrair Mensagem e Classificar').first().json.isOptOut }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        420,
+        600
+      ],
+      "id": "c617484f-b87a-84f0-34df-ab47f254adf7",
+      "name": "42 - E Opt-out?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with alvo as (\n  select d.cliente_id from disparos d\n   where d.telefone_e164 = $1\n   order by d.sent_at desc nulls last limit 1\n)\ninsert into opt_outs (cliente_id, telefone_e164, palavra, origem)\nselect\n  -- denuncia explicita vira supressao global (cliente_id nulo)\n  case when $3::boolean then null else (select cliente_id from alvo) end,\n  $1, $2, 'whatsapp'\non conflict (coalesce(cliente_id, '00000000-0000-0000-0000-000000000000'::uuid), telefone_e164)\ndo nothing;\n\nupdate contatos set status = 'opt_out'\n where telefone_e164 = $1\n   and ($3::boolean or cliente_id = (select d.cliente_id from disparos d\n        where d.telefone_e164 = $1 order by d.sent_at desc nulls last limit 1));",
+        "options": {
+          "queryReplacement": "={{ [ $('40 - Extrair Mensagem e Classificar').first().json.telefone_e164, $('40 - Extrair Mensagem e Classificar').first().json.palavra || 'sair', $('40 - Extrair Mensagem e Classificar').first().json.isDenuncia ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        500
+      ],
+      "id": "a5581460-cb27-1211-10ea-f8fdfa8651c1",
+      "name": "43 - Gravar Opt-out"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        900,
+        600
+      ],
+      "id": "7f45fcce-9eb2-d183-f855-cb664c93ad50",
+      "name": "44 - Responder 200 Inbound"
+    },
+    {
+      "parameters": {
+        "content": "# PAINEL - Saldo e Metricas por Cliente\n\nGET /webhook/crm-disparo/painel?cliente_id=<uuid>\nHeader: x-api-key: $env.CRM_API_KEY\n\nDevolve saldo de creditos, consumo do dia, campanhas com suas taxas e os\nultimos movimentos do razao. E o que alimenta a tela que o cliente ve -\ne a conta que voce cobra no fim do mes.",
+        "height": 340,
+        "width": 660,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        1040
+      ],
+      "id": "2986781c-c353-5d50-6e0c-3cd542f318f3",
+      "name": "PAINEL - README"
+    },
+    {
+      "parameters": {
+        "path": "crm-disparo/painel",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -300,
+        1440
+      ],
+      "id": "fd4b7295-bdb1-faef-63bb-b892c25470a4",
+      "name": "45 - Webhook Painel"
+    },
+    {
+      "parameters": {
+        "jsCode": "const q = $json.query || {};\nconst headers = $json.headers || {};\nconst authOk = String(headers['x-api-key'] || '') === String($env.CRM_API_KEY || '');\nconst clienteId = String(q.cliente_id || '').trim();\nconst uuidOk = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clienteId);\n\nreturn [{ json: { valido: authOk && uuidOk, cliente_id: clienteId,\n  motivo: !authOk ? 'api_key_invalida' : 'cliente_id_invalido' } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -60,
+        1440
+      ],
+      "id": "2c8dc1fe-f872-378b-45a3-5f98f58be950",
+      "name": "46 - Validar Consulta do Painel"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "4fd5da0b-6745-d861-8f94-191e12fc0d73",
+              "leftValue": "={{ $json.valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        180,
+        1440
+      ],
+      "id": "4d1f7e94-98d2-1f8b-0609-02fff7b3af78",
+      "name": "47 - Consulta Valida?"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select jsonb_build_object(\n  'cliente', (select jsonb_build_object(\n                'id', c.id, 'empresa', c.nome_empresa, 'plano', c.plano,\n                'status', c.status, 'creditos_saldo', c.creditos_saldo,\n                'limite_diario', c.limite_diario, 'limite_hora', c.limite_hora)\n              from clientes c where c.id = $1::uuid),\n  'consumo_hoje', (select count(*) from disparos d\n                    where d.cliente_id = $1::uuid\n                      and d.status in ('sent','delivered','read')\n                      and d.sent_at::date = now()::date),\n  'campanhas', coalesce((select jsonb_agg(jsonb_build_object(\n                  'id', c.id, 'nome', c.nome, 'status', c.status,\n                  'enviados', m.enviados, 'entregues', m.entregues,\n                  'taxa_entrega', m.taxa_entrega, 'taxa_leitura', m.taxa_leitura,\n                  'taxa_falha', m.taxa_falha, 'taxa_opt_out', m.taxa_opt_out)\n                  order by c.criado_em desc)\n                from campanhas c\n                left join metricas_campanha m on m.campanha_id = c.id\n                where c.cliente_id = $1::uuid), '[]'::jsonb),\n  'movimentos', coalesce((select jsonb_agg(x) from (\n                  select tipo, quantidade, saldo_apos, referencia, criado_em\n                    from creditos_movimentos\n                   where cliente_id = $1::uuid\n                   order by criado_em desc limit 20) x), '[]'::jsonb)\n) as painel;",
+        "options": {
+          "queryReplacement": "={{ [$json.cliente_id] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        420,
+        1340
+      ],
+      "id": "4f6bce53-93ce-0d84-9cb1-0cb65efa0819",
+      "name": "48 - Consultar Saldo e Metricas"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.painel }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        660,
+        1340
+      ],
+      "id": "6074a09d-b03a-6af4-4893-3bb4c866a9d5",
+      "name": "49 - Responder Painel"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, motivo: $json.motivo } }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        420,
+        1580
+      ],
+      "id": "83629c38-b223-d017-3692-8f342763a903",
+      "name": "50 - Recusar Consulta"
+    }
+  ],
+  "connections": {
+    "01 - Trigger Setup": {
+      "main": [
+        [
+          {
+            "node": "02 - Criar Schema Revenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Criar Schema Revenda": {
+      "main": [
+        [
+          {
+            "node": "03 - Resultado Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - Webhook Lead Anuncio": {
+      "main": [
+        [
+          {
+            "node": "05 - Normalizar e Pontuar Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - Normalizar e Pontuar Lead": {
+      "main": [
+        [
+          {
+            "node": "06 - Lead Valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - Lead Valido?": {
+      "main": [
+        [
+          {
+            "node": "07 - Gravar Lead do Trafego",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "09 - Responder Lead Recusado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 - Gravar Lead do Trafego": {
+      "main": [
+        [
+          {
+            "node": "08 - Responder Lead Aceito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - Webhook Ativar Cliente": {
+      "main": [
+        [
+          {
+            "node": "11 - Aplicar Plano e Limites",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - Aplicar Plano e Limites": {
+      "main": [
+        [
+          {
+            "node": "12 - Ativacao Valida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Ativacao Valida?": {
+      "main": [
+        [
+          {
+            "node": "13 - Criar Cliente e Creditar Plano",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "15 - Responder Ativacao Recusada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 - Criar Cliente e Creditar Plano": {
+      "main": [
+        [
+          {
+            "node": "14 - Responder Ativacao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "16 - Webhook Importar Lista": {
+      "main": [
+        [
+          {
+            "node": "17 - Exigir Consentimento e Normalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17 - Exigir Consentimento e Normalizar": {
+      "main": [
+        [
+          {
+            "node": "18 - Consentimento Declarado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "18 - Consentimento Declarado?": {
+      "main": [
+        [
+          {
+            "node": "19 - Gravar Lista e Contatos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "21 - Recusar Lista Sem Consentimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "19 - Gravar Lista e Contatos": {
+      "main": [
+        [
+          {
+            "node": "20 - Responder Importacao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22 - Agendador Disparo": {
+      "main": [
+        [
+          {
+            "node": "24 - Buscar Campanhas Elegiveis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "23 - Trigger Manual Teste": {
+      "main": [
+        [
+          {
+            "node": "24 - Buscar Campanhas Elegiveis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24 - Buscar Campanhas Elegiveis": {
+      "main": [
+        [
+          {
+            "node": "25 - Guardrails Cliente e Janela",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "25 - Guardrails Cliente e Janela": {
+      "main": [
+        [
+          {
+            "node": "26 - Pode Operar Agora?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "26 - Pode Operar Agora?": {
+      "main": [
+        [
+          {
+            "node": "27 - Proximo Contato Elegivel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LOG - Bloqueio no Dispatcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "27 - Proximo Contato Elegivel": {
+      "main": [
+        [
+          {
+            "node": "28 - Montar Mensagem e Requisicao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "28 - Montar Mensagem e Requisicao": {
+      "main": [
+        [
+          {
+            "node": "29 - Tem Contato?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "29 - Tem Contato?": {
+      "main": [
+        [
+          {
+            "node": "30 - Checar Volume e Saldo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LOG - Bloqueio no Dispatcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "30 - Checar Volume e Saldo": {
+      "main": [
+        [
+          {
+            "node": "31 - Decidir Envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "31 - Decidir Envio": {
+      "main": [
+        [
+          {
+            "node": "32 - Liberado para Enviar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "32 - Liberado para Enviar?": {
+      "main": [
+        [
+          {
+            "node": "33 - Espacamento Entre Envios",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LOG - Bloqueio no Dispatcher",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "33 - Espacamento Entre Envios": {
+      "main": [
+        [
+          {
+            "node": "34 - Enviar pelo Provider do Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "34 - Enviar pelo Provider do Cliente": {
+      "main": [
+        [
+          {
+            "node": "35 - Interpretar Retorno do Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "35 - Interpretar Retorno do Provider": {
+      "main": [
+        [
+          {
+            "node": "36 - Registrar Disparo e Debitar Credito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "36 - Registrar Disparo e Debitar Credito": {
+      "main": [
+        [
+          {
+            "node": "37 - Atualizar Metricas da Campanha",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "37 - Atualizar Metricas da Campanha": {
+      "main": [
+        [
+          {
+            "node": "38 - Pausar Campanha se Qualidade Cair",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "39 - Webhook Inbound": {
+      "main": [
+        [
+          {
+            "node": "40 - Extrair Mensagem e Classificar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "40 - Extrair Mensagem e Classificar": {
+      "main": [
+        [
+          {
+            "node": "41 - Registrar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "41 - Registrar Resposta": {
+      "main": [
+        [
+          {
+            "node": "42 - E Opt-out?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "42 - E Opt-out?": {
+      "main": [
+        [
+          {
+            "node": "43 - Gravar Opt-out",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "44 - Responder 200 Inbound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "43 - Gravar Opt-out": {
+      "main": [
+        [
+          {
+            "node": "44 - Responder 200 Inbound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "45 - Webhook Painel": {
+      "main": [
+        [
+          {
+            "node": "46 - Validar Consulta do Painel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "46 - Validar Consulta do Painel": {
+      "main": [
+        [
+          {
+            "node": "47 - Consulta Valida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "47 - Consulta Valida?": {
+      "main": [
+        [
+          {
+            "node": "48 - Consultar Saldo e Metricas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "50 - Recusar Consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "48 - Consultar Saldo e Metricas": {
+      "main": [
+        [
+          {
+            "node": "49 - Responder Painel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "America/Sao_Paulo"
+  }
+}

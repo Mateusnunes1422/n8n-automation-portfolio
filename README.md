@@ -15,6 +15,7 @@ is a live secret.
 |---|---|---|
 | [multi-tenant-scheduling-saas](workflows/multi-tenant-scheduling-saas.json) | 235 | Booking and management platform serving multiple independent businesses from one deployment. Separate owner, staff and admin interfaces, recurring billing logic, calendar sync. |
 | [salon-tenant-provisioning-e2e](workflows/salon-tenant-provisioning-e2e.json) | 241 | End-to-end tenant provisioning — signup clones a template workflow, strips global nodes, applies a vertical preset and injects a configured AI agent. No manual setup. |
+| [disparo-crm-revenda](workflows/disparo-crm-revenda.json) | 59 | Multi-tenant messaging CRM for reselling campaign delivery. Paid-traffic lead funnel, client onboarding with a credit ledger, consent-gated list import, per-client dispatch and billing. |
 | [whatsapp-cloud-compliance](workflows/whatsapp-cloud-compliance.json) | 47 | WhatsApp Cloud API integration with opt-out handling, delivery status tracking and message templating. |
 | [lead-prospecting-pipeline](workflows/lead-prospecting-pipeline.json) | 11 | Lead discovery and enrichment from public sources, with deduplication. |
 | [lead-capture-google-maps](workflows/lead-capture-google-maps.json) | 18 | Business lead capture via the Places API, normalized into a shared schema. |
@@ -36,12 +37,16 @@ only became obvious after something broke in production.
 - **[Multi-Tenant Scheduling SaaS](docs/multi-tenant-saas.md)** — provisioning a
   complete isolated tenant from a signup, and three things that only fail inside
   AI agent sub-nodes.
+- **[Multi-Tenant Messaging CRM (Reseller)](docs/disparo-crm-revenda.md)** —
+  selling campaign delivery to many clients on shared infrastructure, why a list
+  without proof of consent is refused rather than flagged, and the Postgres CTE
+  trap that silently updated zero rows.
 - **[Lead Discovery & Enrichment Pipeline](docs/lead-pipeline.md)** — free
   sources that don't violate anyone's terms, and the honest verification rate.
 - **[Self-Healing Integration Monitoring](docs/self-healing-monitor.md)** —
   tolerate, self-heal, then escalate with a one-click fix.
 
-## Two design decisions worth reading the code for
+## Three design decisions worth reading the code for
 
 **Human handoff with a silence window** — in `clinic-ai-assistant`, when the
 assistant detects it should escalate, it alerts the team and then goes quiet on
@@ -54,6 +59,12 @@ front of customers.
 connection triggers an automatic restart attempt first. A human is only paged
 when the automatic recovery fails. Most monitoring wakes someone up for problems
 that resolve themselves.
+
+**One statement for the send and the charge** — in `disparo-crm-revenda`, the
+delivery record and the credit debit are a single SQL statement, and the debit
+is gated on the send having actually succeeded. Split into two queries, it
+eventually delivers without charging or charges without delivering. When credits
+are the thing you sell, both are a refund conversation.
 
 ## Stack
 
