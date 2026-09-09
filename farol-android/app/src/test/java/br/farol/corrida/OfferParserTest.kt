@@ -67,6 +67,19 @@ class OfferParserTest {
     }
 
     @Test
+    fun `nao confunde distancia em km com nota`() {
+        // "3,0 km" cai na faixa 1..5 e tem virgula — nao pode virar nota
+        val o = OfferParser.parse(listOf("R$ 25,00", "4 min (3,0 km)", "15 min (5,0 km)"))
+        assertNull(o.rating)
+    }
+
+    @Test
+    fun `prefere a nota com duas casas`() {
+        val o = OfferParser.parse(listOf("R$ 25,00", "4,91", "4 min (3,0 km)", "15 min (9,0 km)"))
+        assertEquals(4.91, o.rating!!, 0.001)
+    }
+
+    @Test
     fun `tela sem oferta nao e utilizavel`() {
         val o = OfferParser.parse(listOf("Você está online", "Procurando corridas"))
         assertTrue(!o.isUsable)

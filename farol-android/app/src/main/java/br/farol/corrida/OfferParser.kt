@@ -71,15 +71,17 @@ object OfferParser {
         // Uber mostra dois: primeiro até o passageiro, depois a viagem.
         val pairs = mutableListOf<Pair<Int, Double>>()
         for (line in clean) {
-            MIN_THEN_KM.find(line)?.let { m ->
-                val mn = m.groupValues[1].toIntOrNull()
-                val km = num(m.groupValues[2])
+            val direct = MIN_THEN_KM.find(line)
+            if (direct != null) {
+                val mn = direct.groupValues[1].toIntOrNull()
+                val km = num(direct.groupValues[2])
                 if (mn != null && km != null) pairs += mn to km
-                return@let
+                continue
             }
-            KM_THEN_MIN.find(line)?.let { m ->
-                val km = num(m.groupValues[1])
-                val mn = m.groupValues[2].toIntOrNull()
+            val inverted = KM_THEN_MIN.find(line)
+            if (inverted != null) {
+                val km = num(inverted.groupValues[1])
+                val mn = inverted.groupValues[2].toIntOrNull()
                 if (mn != null && km != null) pairs += mn to km
             }
         }
@@ -95,14 +97,21 @@ object OfferParser {
         val trip = pairs.getOrNull(1)
 
         // ----- Nota do passageiro -----
-        // Evita confundir com valores em reais: descarta o que vier logo após "R$".
-        val rating = RATING.findAll(joined)
+        // Um "3,0" solto pode ser nota, mas "3,0 km" e "R$ 3,00" não são.
+        // Descarta o que vier logo depois de "R$" e o que for seguido de unidade.
+        val unitAfter = Regex("""^\s*(km|min|h\b|%|R\$)""", RegexOption.IGNORE_CASE)
+        val ratings = RATING.findAll(joined)
             .filter { m ->
                 val before = joined.substring(maxOf(0, m.range.first - 4), m.range.first)
-                !before.contains("R$")
+                val from = m.range.last + 1
+                val after = joined.substring(from, minOf(joined.length, from + 6))
+                !before.contains("R$") && !unitAfter.containsMatchIn(after)
             }
-            .mapNotNull { num(it.groupValues[1]) }
-            .firstOrNull { it in 1.0..5.0 }
+            .mapNotNull { m -> num(m.groupValues[1])?.takeIf { it in 1.0..5.0 } }
+            .toList()
+
+        // Nota costuma vir com duas casas (4,82). Se houver uma assim, é ela.
+        val rating = ratings.firstOrNull { it * 100 % 10 != 0.0 } ?: ratings.firstOrNull()
 
         return if (pairs.size >= 2) {
             Offer(fare, pickup?.first, pickup?.second, trip?.first, trip?.second, rating, clean)
