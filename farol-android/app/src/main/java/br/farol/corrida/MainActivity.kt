@@ -135,9 +135,17 @@ class MainActivity : AppCompatActivity() {
     /** Modo aprendizado: mostra o texto cru lido da última tela. */
     private fun showCapture() {
         val (pkg, text) = Settings.lastCapture(this)
+        val cfg = Settings.load(this)
         val msg = if (text.isBlank())
-            "Nada capturado ainda.\n\nLigue o \"modo aprendizado\", abra o app de corrida e espere uma oferta aparecer. Depois volte aqui.\n\nSe o Farol não estiver lendo direito, me mande esse texto que eu ajusto a leitura."
-        else "Pacote: $pkg\n\n$text"
+            "Nada capturado ainda.\n\n" +
+                "Ligue o \"modo aprendizado\", abra o app de corrida e espere uma oferta " +
+                "aparecer na tela. Depois volte aqui.\n\n" +
+                "Apps que o Farol acompanha hoje:\n" + cfg.monitoredPackages.joinToString("\n") { "• $it" }
+        else {
+            val conhecido = if (pkg in cfg.monitoredPackages) "✅ na lista"
+            else "⚠️ FORA da lista — é por isso que o card não aparece"
+            "Pacote: $pkg ($conhecido)\n\n$text"
+        }
         AlertDialog.Builder(this).setTitle("Última leitura da tela").setMessage(msg)
             .setPositiveButton("Ok", null).show()
     }

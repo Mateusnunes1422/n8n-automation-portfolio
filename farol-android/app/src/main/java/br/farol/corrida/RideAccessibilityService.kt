@@ -61,30 +61,43 @@ class RideAccessibilityService : AccessibilityService() {
         if (!cfg.enabled) { hideOverlay(); return }
 
         val pkg = event.packageName?.toString() ?: return
-        if (pkg !in cfg.monitoredPackages) return
+        val monitored = pkg in cfg.monitoredPackages
+
+        // Fora do modo aprendizado só olhamos os apps de corrida conhecidos.
+        // Com ele ligado olhamos qualquer tela, para descobrir o nome do pacote
+        // quando o Uber ou a 99 aparecem com um pacote que ainda não está na lista.
+        if (!monitored && !cfg.learnMode) return
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> scheduleScan(pkg)
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> scheduleScan(pkg, monitored)
         }
     }
 
-    private fun scheduleScan(pkg: String) {
+    private fun scheduleScan(pkg: String, monitored: Boolean) {
         pendingScan?.let { handler.removeCallbacks(it) }
-        val r = Runnable { scan(pkg) }
+        val r = Runnable { scan(pkg, monitored) }
         pendingScan = r
         handler.postDelayed(r, DEBOUNCE_MS)
     }
 
-    private fun scan(pkg: String) {
+    private fun scan(pkg: String, monitored: Boolean) {
         val root = rootInActiveWindow ?: return
         val texts = mutableListOf<String>()
         collectText(root, texts, 0)
         if (texts.isEmpty()) return
 
         if (cfg.learnMode) {
-            Settings.saveLastCapture(this, pkg, texts.joinToString("\n"))
+            val joined = texts.joinToString("\n")
+            // Numa tela de app desconhecido, só guarda se parecer uma oferta.
+            // Evita registrar tela de banco, conversa e afins enquanto diagnostica.
+            if (monitored || joined.contains("R$")) {
+                Settings.saveLastCapture(this, pkg, joined)
+            }
         }
+
+        // Card só aparece nos apps de corrida conhecidos.
+        if (!monitored) return
 
         val offer = OfferParser.parse(texts)
         val now = System.currentTimeMillis()
