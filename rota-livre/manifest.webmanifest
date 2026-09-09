@@ -1,0 +1,16 @@
+{
+  "name": "Rota Livre — Otimizador de Rotas",
+  "short_name": "Rota Livre",
+  "description": "Organize suas entregas e navegue na melhor ordem. Grátis e sem cadastro.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f766e",
+  "theme_color": "#0f766e",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

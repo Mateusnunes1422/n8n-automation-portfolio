@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>Rota Livre — Otimizador de Rotas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root{
+    --bg:#f1f5f4; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0;
+    --brand:#0f766e; --brand-dark:#115e59; --brand-soft:#ccfbf1;
+    --accent:#f59e0b; --danger:#dc2626; --ok:#16a34a;
+    --shadow:0 1px 3px rgba(15,23,42,.08),0 1px 2px rgba(15,23,42,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){ --bg:#0b1220; --card:#131c2e; --ink:#e5edf5; --muted:#94a3b8; --line:#233145;
+      --brand:#2dd4bf; --brand-dark:#5eead4; --brand-soft:#134e4a; --shadow:0 1px 3px rgba(0,0,0,.4); }
+  }
+  :root[data-theme="dark"]{ --bg:#0b1220; --card:#131c2e; --ink:#e5edf5; --muted:#94a3b8; --line:#233145;
+    --brand:#2dd4bf; --brand-dark:#5eead4; --brand-soft:#134e4a; --shadow:0 1px 3px rgba(0,0,0,.4); }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    padding-bottom:88px;
+  }
+  header{
+    position:sticky; top:0; z-index:20;
+    background:linear-gradient(135deg,var(--brand),var(--brand-dark));
+    color:#fff; padding:14px 16px calc(14px);
+    padding-top:calc(14px + env(safe-area-inset-top));
+    box-shadow:var(--shadow);
+  }
+  .brand{display:flex;align-items:center;gap:10px}
+  .brand .logo{
+    width:34px;height:34px;border-radius:9px;background:rgba(255,255,255,.18);
+    display:grid;place-items:center;font-size:20px;flex:0 0 auto;
+  }
+  .brand h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.2px}
+  .brand small{display:block;font-weight:400;opacity:.85;font-size:11.5px;margin-top:1px}
+  .loc-chip{
+    margin-top:12px;display:flex;align-items:center;gap:8px;font-size:12.5px;
+    background:rgba(255,255,255,.15);border-radius:999px;padding:7px 12px;color:#fff;
+    width:100%;border:none;text-align:left;cursor:pointer;
+  }
+  .loc-chip b{font-weight:600}
+  main{max-width:640px;margin:0 auto;padding:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:14px;margin-bottom:14px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 10px}
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px;font-weight:600}
+  input,textarea,select{
+    width:100%;font:inherit;color:var(--ink);background:var(--bg);
+    border:1px solid var(--line);border-radius:10px;padding:11px 12px;
+  }
+  textarea{resize:vertical;min-height:70px}
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  button{font:inherit;cursor:pointer;border:none;border-radius:10px}
+  .btn{
+    background:var(--brand);color:#fff;padding:12px 14px;font-weight:600;
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn.secondary{background:var(--brand-soft);color:var(--brand-dark)}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink)}
+  .btn.sm{padding:8px 10px;font-size:13px;width:auto}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:6px}
+  .empty{text-align:center;color:var(--muted);padding:26px 10px}
+  .empty .big{font-size:34px;margin-bottom:6px}
+  /* stop cards */
+  .stop{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);padding:12px;margin-bottom:10px;position:relative;overflow:hidden;
+  }
+  .stop.done{opacity:.6}
+  .stop.done .addr{text-decoration:line-through}
+  .stop .top{display:flex;gap:11px;align-items:flex-start}
+  .num{
+    flex:0 0 auto;width:30px;height:30px;border-radius:9px;background:var(--brand);
+    color:#fff;font-weight:700;display:grid;place-items:center;font-size:14px;
+  }
+  .stop.done .num{background:var(--ok)}
+  .info{flex:1;min-width:0}
+  .addr{font-weight:600;word-break:break-word}
+  .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .note{font-size:12.5px;color:var(--muted);margin-top:4px;font-style:italic}
+  .actions{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+  .actions .btn{width:auto;flex:1;min-width:88px;padding:9px 8px;font-size:13px}
+  .gmaps{background:#1a73e8;color:#fff}
+  .waze{background:#33ccff;color:#062a3a}
+  .iconbtn{background:transparent;border:1px solid var(--line);color:var(--muted);width:34px;height:34px;display:grid;place-items:center;font-size:15px;border-radius:9px}
+  .side{display:flex;flex-direction:column;gap:6px;align-items:center}
+  /* bottom bar */
+  .bar{
+    position:fixed;left:0;right:0;bottom:0;z-index:30;
+    background:var(--card);border-top:1px solid var(--line);
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    display:flex;gap:10px;align-items:center;max-width:640px;margin:0 auto;
+    box-shadow:0 -2px 10px rgba(15,23,42,.06);
+  }
+  .bar .stats{flex:1;font-size:12.5px;line-height:1.3}
+  .bar .stats b{font-size:16px;display:block;color:var(--ink)}
+  .toast{
+    position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:13px;
+    opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:90%;text-align:center;box-shadow:var(--shadow);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .tabs{display:flex;gap:6px;margin-bottom:10px}
+  .tab{flex:1;padding:9px;text-align:center;border-radius:10px;background:var(--bg);color:var(--muted);font-size:13px;font-weight:600;border:1px solid var(--line)}
+  .tab.on{background:var(--brand-soft);color:var(--brand-dark);border-color:transparent}
+  dialog{border:none;border-radius:16px;padding:0;max-width:92%;width:420px;background:var(--card);color:var(--ink);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+  dialog::backdrop{background:rgba(0,0,0,.45)}
+  .dlg{padding:18px}
+  .dlg h3{margin:0 0 12px;font-size:16px}
+  .install-cta{display:none;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">🛵</div>
+    <div>
+      <h1>Rota Livre</h1>
+      <small>Organize suas entregas e navegue na melhor ordem</small>
+    </div>
+  </div>
+  <button class="loc-chip" id="locChip">📍 <span id="locText"><b>Toque para usar sua localização</b> como ponto de partida</span></button>
+</header>
+
+<main>
+  <!-- Adicionar paradas -->
+  <div class="card">
+    <div class="tabs">
+      <div class="tab on" data-tab="one">Uma parada</div>
+      <div class="tab" data-tab="many">Colar lista</div>
+    </div>
+
+    <div id="tab-one">
+      <label for="addr">Endereço, ou "latitude,longitude", ou link do Google Maps</label>
+      <input id="addr" placeholder="Ex: Av. Paulista, 1578, São Paulo" autocomplete="off">
+      <div class="row" style="margin-top:8px">
+        <input id="note" placeholder="Obs. (opcional): nº, cliente, telefone…">
+      </div>
+      <div style="margin-top:10px">
+        <button class="btn" id="addBtn">➕ Adicionar parada</button>
+      </div>
+      <div class="hint">A busca de endereço usa o OpenStreetMap (grátis). Você também pode colar coordenadas ou um link do Maps.</div>
+    </div>
+
+    <div id="tab-many" hidden>
+      <label for="bulk">Cole vários endereços — um por linha</label>
+      <textarea id="bulk" placeholder="Rua A, 100&#10;Rua B, 250&#10;-23.561,-46.656"></textarea>
+      <div style="margin-top:10px">
+        <button class="btn" id="bulkBtn">➕ Adicionar todos</button>
+      </div>
+      <div class="hint">Cada linha vira uma parada. Pode misturar endereços e coordenadas.</div>
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div id="list"></div>
+</main>
+
+<div class="bar">
+  <div class="stats">
+    <span><b id="statCount">0</b> paradas · <span id="statDist">—</span></span>
+  </div>
+  <button class="btn secondary sm" id="optBtn" style="flex:0 0 auto;padding:11px 14px">⚡ Otimizar</button>
+  <button class="btn sm gmaps" id="routeBtn" style="flex:0 0 auto;padding:11px 14px">🗺️ Rota</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<dialog id="menu">
+  <div class="dlg">
+    <h3>Menu</h3>
+    <button class="btn ghost" id="mClear" style="margin-bottom:8px">🧹 Limpar todas as paradas</button>
+    <button class="btn ghost install-cta" id="mInstall" style="margin-bottom:8px">⬇️ Instalar na tela inicial</button>
+    <button class="btn ghost" id="mDemo" style="margin-bottom:8px">✨ Carregar rota de exemplo</button>
+    <button class="btn" id="mClose">Fechar</button>
+    <p class="hint" style="text-align:center;margin-top:12px">Rota Livre · funciona offline · seus dados ficam só no seu celular</p>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+/* ---------- Estado ---------- */
+const KEY = "rotalivre.v1";
+let stops = [];        // {id, addr, label, lat, lng, note, done}
+let origin = null;     // {lat,lng} localização atual (partida)
+let state = { stops: [], origin: null };
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){ const s = JSON.parse(raw); stops = s.stops||[]; origin = s.origin||null; }
+  }catch(e){}
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify({stops, origin})); }catch(e){}
+}
+
+/* ---------- Utilidades ---------- */
+const $ = s => document.querySelector(s);
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove("show"), 2400);
+}
+function haversine(a,b){
+  const R=6371, toR=x=>x*Math.PI/180;
+  const dLat=toR(b.lat-a.lat), dLng=toR(b.lng-a.lng);
+  const s=Math.sin(dLat/2)**2 + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+function fmtKm(km){ return km<1 ? Math.round(km*1000)+" m" : km.toFixed(1).replace(".",",")+" km"; }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+
+/* Interpreta a entrada: coordenadas, link do maps, ou endereço para geocodificar */
+function parseCoords(text){
+  const t = text.trim();
+  // "lat,lng"
+  let m = t.match(/^\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+  if(m) return { lat:+m[1], lng:+m[2] };
+  // link com @lat,lng  ou  q=lat,lng  ou  ll=lat,lng  ou  /dir/lat,lng
+  m = t.match(/[@=\/](-?\d{1,2}\.\d{3,}),(-?\d{1,3}\.\d{3,})/);
+  if(m) return { lat:+m[1], lng:+m[2] };
+  return null;
+}
+async function geocode(text){
+  const coords = parseCoords(text);
+  if(coords) return { ...coords, addr:text.trim(), label: text.trim() };
+  const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&q="
+              + encodeURIComponent(text);
+  const res = await fetch(url, { headers:{ "Accept-Language":"pt-BR" } });
+  if(!res.ok) throw new Error("geo");
+  const data = await res.json();
+  if(!data.length) throw new Error("none");
+  const r = data[0];
+  return { lat:+r.lat, lng:+r.lon, addr:text.trim(), label: r.display_name };
+}
+
+/* ---------- Localização atual ---------- */
+function getLocation(){
+  if(!navigator.geolocation){ toast("Geolocalização indisponível neste aparelho"); return; }
+  $("#locText").innerHTML = "<b>Buscando sua localização…</b>";
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      origin = { lat:pos.coords.latitude, lng:pos.coords.longitude };
+      save(); renderLoc(); render();
+      toast("Localização definida como ponto de partida ✅");
+    },
+    err=>{
+      $("#locText").innerHTML = "<b>Não consegui pegar a localização.</b> Toque para tentar de novo";
+      toast("Permita o acesso à localização para otimizar a partir de você");
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:60000 }
+  );
+}
+function renderLoc(){
+  if(origin){
+    $("#locText").innerHTML = "📍 Partindo da <b>sua localização atual</b> · toque para atualizar";
+  }else{
+    $("#locText").innerHTML = "<b>Toque para usar sua localização</b> como ponto de partida";
+  }
+}
+
+/* ---------- Adicionar ---------- */
+async function addOne(text, note){
+  text = (text||"").trim();
+  if(!text) return;
+  toast("Buscando endereço…");
+  try{
+    const g = await geocode(text);
+    stops.push({ id:uid(), addr:g.addr, label:g.label, lat:g.lat, lng:g.lng, note:(note||"").trim(), done:false });
+    save(); render();
+    toast("Parada adicionada ✅");
+  }catch(e){
+    if(e.message==="none") toast("Endereço não encontrado. Tente mais detalhes ou coordenadas.");
+    else toast("Sem conexão pra buscar. Cole coordenadas: lat,lng");
+  }
+}
+async function addMany(textBlock){
+  const lines = textBlock.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(!lines.length) return;
+  let ok=0, fail=0;
+  for(const line of lines){
+    try{
+      const g = await geocode(line);
+      stops.push({ id:uid(), addr:g.addr, label:g.label, lat:g.lat, lng:g.lng, note:"", done:false });
+      ok++; save(); render();
+    }catch(e){ fail++; }
+    await new Promise(r=>setTimeout(r, 1100)); // respeita limite do OpenStreetMap
+  }
+  toast(`${ok} adicionada(s)` + (fail?`, ${fail} não encontrada(s)`:""));
+}
+
+/* ---------- Otimização (vizinho mais próximo + 2-opt) ---------- */
+function routeDistance(seq, start){
+  let total=0, prev=start;
+  for(const s of seq){ if(prev) total+=haversine(prev,s); prev=s; }
+  return total;
+}
+function optimize(){
+  const pend = stops.filter(s=>!s.done);
+  const done = stops.filter(s=>s.done);
+  if(pend.length<2){ toast("Precisa de pelo menos 2 paradas pendentes"); return; }
+  const start = origin || pend[0];
+  // vizinho mais próximo
+  let remaining = pend.slice(), seq=[], cur=start;
+  while(remaining.length){
+    let bi=0, bd=Infinity;
+    remaining.forEach((s,i)=>{ const d=haversine(cur,s); if(d<bd){bd=d;bi=i;} });
+    cur = remaining[bi]; seq.push(cur); remaining.splice(bi,1);
+  }
+  // 2-opt
+  let improved=true, guard=0;
+  while(improved && guard++<50){
+    improved=false;
+    for(let i=0;i<seq.length-1;i++){
+      for(let k=i+1;k<seq.length;k++){
+        const ns = seq.slice(0,i).concat(seq.slice(i,k+1).reverse(), seq.slice(k+1));
+        if(routeDistance(ns,start) + 1e-9 < routeDistance(seq,start)){ seq=ns; improved=true; }
+      }
+    }
+  }
+  stops = seq.concat(done); // pendentes otimizadas primeiro, concluídas no fim
+  save(); render();
+  toast("Rota otimizada ⚡ " + fmtKm(routeDistance(seq,start)) + " no total");
+}
+
+/* ---------- Navegação ---------- */
+function gmapsOne(s){ return `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=driving`; }
+function wazeOne(s){ return `https://waze.com/ul?ll=${s.lat},${s.lng}&navigate=yes`; }
+function openRoute(){
+  const pend = stops.filter(s=>!s.done);
+  if(!pend.length){ toast("Sem paradas pendentes"); return; }
+  if(pend.length===1){ window.open(gmapsOne(pend[0]),"_blank"); return; }
+  const pts = pend.slice(0,10); // limite prático da URL do Google Maps
+  const dest = pts[pts.length-1];
+  const way = pts.slice(0,-1).map(s=>`${s.lat},${s.lng}`).join("|");
+  let url = `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}&travelmode=driving`;
+  if(origin) url += `&origin=${origin.lat},${origin.lng}`;
+  if(way) url += `&waypoints=${encodeURIComponent(way)}`;
+  window.open(url,"_blank");
+  if(pend.length>10) toast("Google Maps abre até 10 paradas por vez");
+}
+
+/* ---------- Render ---------- */
+function move(id,dir){
+  const i = stops.findIndex(s=>s.id===id); if(i<0) return;
+  const j = i+dir; if(j<0||j>=stops.length) return;
+  [stops[i],stops[j]]=[stops[j],stops[i]]; save(); render();
+}
+function toggleDone(id){ const s=stops.find(x=>x.id===id); if(s){ s.done=!s.done; save(); render(); } }
+function remove(id){ stops=stops.filter(s=>s.id!==id); save(); render(); }
+
+function render(){
+  const list = $("#list");
+  const pendCount = stops.filter(s=>!s.done).length;
+  $("#statCount").textContent = pendCount;
+
+  // distância total estimada da rota pendente
+  const pend = stops.filter(s=>!s.done);
+  if(pend.length){
+    const start = origin || pend[0];
+    $("#statDist").textContent = "≈ " + fmtKm(routeDistance(pend, start));
+  }else $("#statDist").textContent = "—";
+
+  if(!stops.length){
+    list.innerHTML = `<div class="card"><div class="empty">
+      <div class="big">🛵</div>
+      <div><b>Nenhuma parada ainda</b></div>
+      <div style="margin-top:6px;font-size:13px">Adicione endereços acima e toque em <b>⚡ Otimizar</b> pra descobrir a melhor ordem.</div>
+    </div></div>`;
+    return;
+  }
+  list.innerHTML = "";
+  let n=0;
+  stops.forEach(s=>{
+    if(!s.done) n++;
+    const el = document.createElement("div");
+    el.className = "stop" + (s.done?" done":"");
+    const distTxt = origin && !s.done ? fmtKm(haversine(origin,s)) + " de você" : "";
+    el.innerHTML = `
+      <div class="top">
+        <div class="num">${s.done?"✓":n}</div>
+        <div class="info">
+          <div class="addr">${esc(s.label||s.addr)}</div>
+          <div class="meta">${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}${distTxt?" · "+distTxt:""}</div>
+          ${s.note?`<div class="note">📝 ${esc(s.note)}</div>`:""}
+        </div>
+        <div class="side">
+          <button class="iconbtn" data-up="${s.id}">▲</button>
+          <button class="iconbtn" data-down="${s.id}">▼</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn gmaps" data-g="${s.id}">Google Maps</button>
+        <button class="btn waze" data-w="${s.id}">Waze</button>
+        <button class="btn ghost" data-done="${s.id}">${s.done?"↩️ Reabrir":"✅ Entregue"}</button>
+        <button class="iconbtn" data-del="${s.id}" style="color:var(--danger)">🗑️</button>
+      </div>`;
+    list.appendChild(el);
+  });
+}
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* ---------- Eventos ---------- */
+document.addEventListener("click",e=>{
+  const t=e.target.closest("[data-g],[data-w],[data-done],[data-del],[data-up],[data-down]");
+  if(!t) return;
+  if(t.dataset.g){ const s=stops.find(x=>x.id===t.dataset.g); window.open(gmapsOne(s),"_blank"); }
+  else if(t.dataset.w){ const s=stops.find(x=>x.id===t.dataset.w); window.open(wazeOne(s),"_blank"); }
+  else if(t.dataset.done){ toggleDone(t.dataset.done); }
+  else if(t.dataset.del){ remove(t.dataset.del); }
+  else if(t.dataset.up){ move(t.dataset.up,-1); }
+  else if(t.dataset.down){ move(t.dataset.down,1); }
+});
+$("#addBtn").onclick = ()=>{ addOne($("#addr").value, $("#note").value); $("#addr").value=""; $("#note").value=""; $("#addr").focus(); };
+$("#addr").addEventListener("keydown",e=>{ if(e.key==="Enter") $("#addBtn").click(); });
+$("#bulkBtn").onclick = ()=>{ addMany($("#bulk").value); $("#bulk").value=""; };
+$("#optBtn").onclick = optimize;
+$("#routeBtn").onclick = openRoute;
+$("#locChip").onclick = getLocation;
+
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+    tab.classList.add("on");
+    $("#tab-one").hidden = tab.dataset.tab!=="one";
+    $("#tab-many").hidden = tab.dataset.tab!=="many";
+  };
+});
+
+/* Menu (toque longo / duplo no logo abre o menu) */
+$(".logo").addEventListener("click", ()=> $("#menu").showModal());
+$("#mClose").onclick = ()=> $("#menu").close();
+$("#mClear").onclick = ()=>{ if(confirm("Apagar todas as paradas?")){ stops=[]; save(); render(); $("#menu").close(); } };
+$("#mDemo").onclick = ()=>{ loadDemo(); $("#menu").close(); };
+$("#mInstall").onclick = ()=>{ if(deferredPrompt){ deferredPrompt.prompt(); } $("#menu").close(); };
+
+/* ---------- Rota de exemplo (São Paulo) ---------- */
+function loadDemo(){
+  const demo = [
+    {addr:"Av. Paulista, 1578", label:"MASP — Av. Paulista, 1578", lat:-23.5614, lng:-46.6559},
+    {addr:"Mercadão de SP", label:"Mercado Municipal — Centro", lat:-23.5419, lng:-46.6295},
+    {addr:"Parque Ibirapuera", label:"Parque Ibirapuera", lat:-23.5874, lng:-46.6576},
+    {addr:"Estádio do Morumbi", label:"Estádio Morumbi", lat:-23.6009, lng:-46.7194},
+    {addr:"Praça da Sé", label:"Praça da Sé — Centro", lat:-23.5503, lng:-46.6339},
+  ];
+  stops = demo.map(d=>({ id:uid(), ...d, note:"", done:false }));
+  origin = { lat:-23.5680, lng:-46.6490 }; // Trianon-Masp
+  save(); renderLoc(); render();
+  toast("Rota de exemplo carregada — toque em ⚡ Otimizar");
+}
+
+/* ---------- Install prompt ---------- */
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); deferredPrompt=e; document.querySelector(".install-cta").style.display="flex"; });
+
+/* ---------- Service worker ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
+
+/* ---------- Início ---------- */
+load();
+if(!stops.length){ loadDemo(); }   // primeira vez: mostra exemplo
+renderLoc();
+render();
+</script>
+</body>
+</html>
