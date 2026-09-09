@@ -1,0 +1,8 @@
+# Build do Android / Gradle
+build/
+.gradle/
+local.properties
+*.apk
+*.aab
+captures/
+.cxx/

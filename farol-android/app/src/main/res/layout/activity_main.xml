@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Farol"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="20dp"
+            android:text="Mostra na hora se a corrida vale a pena, por cima do Uber e da 99."
+            android:textSize="14sp" />
+
+        <!-- ===== Permissões ===== -->
+        <TextView style="@style/FarolSection" android:text="1. Permissões" />
+
+        <TextView
+            android:id="@+id/statusAcc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/btnAcc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Ligar leitura de tela" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="10dp"
+            android:text="Em Acessibilidade → Apps instalados → Farol → ativar."
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/statusOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="—"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/btnOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="18dp"
+            android:text="Permitir sobrepor outros apps" />
+
+        <!-- ===== Metas ===== -->
+        <TextView style="@style/FarolSection" android:text="2. Suas metas" />
+
+        <TextView style="@style/FarolLabel" android:text="Mínimo por km (R$)" />
+        <EditText
+            android:id="@+id/minKm"
+            style="@style/FarolInput"
+            android:inputType="numberDecimal"
+            android:autofillHints="" />
+
+        <TextView style="@style/FarolLabel" android:text="Mínimo por hora (R$)" />
+        <EditText
+            android:id="@+id/minHour"
+            style="@style/FarolInput"
+            android:inputType="numberDecimal"
+            android:autofillHints="" />
+
+        <TextView style="@style/FarolLabel" android:text="Nota mínima do passageiro (deixe vazio pra ignorar)" />
+        <EditText
+            android:id="@+id/minRating"
+            style="@style/FarolInput"
+            android:inputType="numberDecimal"
+            android:autofillHints="" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/countPickup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="18dp"
+            android:text="Contar o trecho até o passageiro na conta" />
+
+        <!-- ===== Combustível ===== -->
+        <TextView style="@style/FarolSection" android:text="3. Combustível" />
+
+        <TextView style="@style/FarolLabel" android:text="Consumo do carro (km por litro)" />
+        <EditText
+            android:id="@+id/kmPerLiter"
+            style="@style/FarolInput"
+            android:inputType="numberDecimal"
+            android:autofillHints="" />
+
+        <TextView style="@style/FarolLabel" android:text="Preço do litro (R$)" />
+        <EditText
+            android:id="@+id/fuelPrice"
+            style="@style/FarolInput"
+            android:inputType="numberDecimal"
+            android:autofillHints="" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="18dp"
+            android:text="Usado pra calcular quanto sobra limpo na sua mão."
+            android:textSize="12sp" />
+
+        <!-- ===== Segurança ===== -->
+        <TextView style="@style/FarolSection" android:text="4. Locais de risco" />
+
+        <TextView style="@style/FarolLabel" android:text="Palavras que acendem alerta (separadas por vírgula)" />
+        <EditText
+            android:id="@+id/riskWords"
+            style="@style/FarolInput"
+            android:inputType="textMultiLine"
+            android:minLines="2"
+            android:hint="Ex: Cracolândia, Jardim X, Morro Y"
+            android:autofillHints="" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="18dp"
+            android:text="Se alguma aparecer no endereço da oferta, o card acende alerta."
+            android:textSize="12sp" />
+
+        <!-- ===== Diagnóstico ===== -->
+        <TextView style="@style/FarolSection" android:text="5. Se não estiver lendo direito" />
+
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/learnMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Modo aprendizado (guarda o texto lido da tela)" />
+
+        <Button
+            android:id="@+id/btnCapture"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="20dp"
+            android:text="Ver última leitura da tela" />
+
+        <!-- ===== Ações ===== -->
+        <Button
+            android:id="@+id/btnTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="Testar com uma oferta de exemplo" />
+
+        <Button
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Salvar" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="O Farol só lê e calcula. Ele nunca aceita corrida por você, e nada sai do seu celular."
+            android:textSize="12sp"
+            android:gravity="center" />
+    </LinearLayout>
+</ScrollView>

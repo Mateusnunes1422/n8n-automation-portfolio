@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Semáforo: três luzes, a de cima acesa em verde -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M42,28 h24 a6,6 0 0 1 6,6 v40 a6,6 0 0 1 -6,6 h-24 a6,6 0 0 1 -6,-6 v-40 a6,6 0 0 1 6,-6 z" />
+    <path android:fillColor="#2ECC71" android:pathData="M54,41 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:fillColor="#33000000" android:pathData="M54,54 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+    <path android:fillColor="#33000000" android:pathData="M54,67 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+</vector>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Farol</string>
+    <string name="accessibility_description">Lê o valor, a distância e o tempo da oferta de corrida na tela do Uber e da 99 para mostrar na hora se ela vale a pena. Nada é enviado para fora do aparelho e o app nunca toca na tela por você.</string>
+</resources>
