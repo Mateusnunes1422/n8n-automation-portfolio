@@ -2,6 +2,7 @@ package br.farol.corrida
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Handler
@@ -38,15 +39,25 @@ class RideAccessibilityService : AccessibilityService() {
         private const val MAX_NODES = 400
     }
 
+    /**
+     * Recarrega as metas só quando o motorista muda alguma coisa na tela de
+     * configuração. Ler as preferências a cada evento de tela seria desperdício:
+     * o Android dispara dezenas deles por segundo.
+     */
+    private val prefsListener =
+        SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key != "lastCapture" && key != "lastCapturePkg") cfg = Settings.load(this)
+        }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         cfg = Settings.load(this)
+        Settings.prefs(this).registerOnSharedPreferenceChangeListener(prefsListener)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
-        cfg = Settings.load(this)
         if (!cfg.enabled) { hideOverlay(); return }
 
         val pkg = event.packageName?.toString() ?: return
@@ -185,6 +196,7 @@ class RideAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         pendingScan?.let { handler.removeCallbacks(it) }
+        Settings.prefs(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
         removeOverlay()
         super.onDestroy()
     }
