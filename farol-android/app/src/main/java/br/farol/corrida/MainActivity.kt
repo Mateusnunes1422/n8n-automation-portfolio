@@ -31,6 +31,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusOverlay: TextView
     private lateinit var previewCard: View
     private lateinit var headerPill: TextView
+    private lateinit var masterSwitch: MaterialSwitch
+    private lateinit var masterCard: View
+    private lateinit var masterTitle: TextView
+    private lateinit var masterSub: TextView
     private var previewLevel = Level.GREEN
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +55,20 @@ class MainActivity : AppCompatActivity() {
         statusAcc = findViewById(R.id.statusAcc)
         statusOverlay = findViewById(R.id.statusOverlay)
         headerPill = findViewById(R.id.headerPill)
+        masterSwitch = findViewById(R.id.masterSwitch)
+        masterCard = findViewById(R.id.masterCard)
+        masterTitle = findViewById(R.id.masterTitle)
+        masterSub = findViewById(R.id.masterSub)
+
+        // Estado antes do listener, para o primeiro desenho nao gravar de volta.
+        masterSwitch.isChecked = Settings.isEnabled(this)
+
+        // Liga/desliga grava na hora: nao faz sentido exigir "Salvar" para isso.
+        masterSwitch.setOnCheckedChangeListener { _, on ->
+            Settings.setEnabled(this, on)
+            refreshMaster()
+            refreshStatus()
+        }
 
         findViewById<Button>(R.id.btnAcc).setOnClickListener {
             startActivity(Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -81,11 +99,29 @@ class MainActivity : AppCompatActivity() {
 
         loadIntoFields()
         refreshPreview()
+        refreshMaster()
     }
 
     override fun onResume() {
         super.onResume()
+        // Pode ter sido desligado pelo atalho da aba de notificacoes.
+        val ligado = Settings.isEnabled(this)
+        if (masterSwitch.isChecked != ligado) masterSwitch.isChecked = ligado
+        refreshMaster()
         refreshStatus()
+    }
+
+    /** Estado do interruptor principal: titulo, explicacao e borda do cartao. */
+    private fun refreshMaster() {
+        val on = Settings.isEnabled(this)
+        masterTitle.text = if (on) "Farol ligado" else "Farol desligado"
+        masterSub.text = if (on)
+            "Quando chegar uma oferta no Uber ou na 99, o cartão aparece por cima."
+        else
+            "Nenhum cartão vai aparecer. As suas metas continuam guardadas."
+        masterCard.setBackgroundResource(
+            if (on) R.drawable.bg_surface_on else R.drawable.bg_surface
+        )
     }
 
     private fun loadIntoFields() {
@@ -212,11 +248,15 @@ class MainActivity : AppCompatActivity() {
         statusLine(statusAcc, accOn, "Leitura de tela ligada", "Leitura de tela desligada")
         statusLine(statusOverlay, overlayOn, "Sobreposição permitida", "Sobreposição não permitida")
 
+        val ligado = Settings.isEnabled(this)
         val pronto = accOn && overlayOn
-        headerPill.text = if (pronto) "● no ar" else "● falta liberar"
-        headerPill.setTextColor(
-            ContextCompat.getColor(this, if (pronto) R.color.accent else R.color.lvl_yellow)
-        )
+        val (texto, cor) = when {
+            !ligado -> "● desligado" to R.color.ink_dim
+            pronto -> "● no ar" to R.color.accent
+            else -> "● falta liberar" to R.color.lvl_yellow
+        }
+        headerPill.text = texto
+        headerPill.setTextColor(ContextCompat.getColor(this, cor))
     }
 
     private fun statusLine(view: TextView, ok: Boolean, yes: String, no: String) {

@@ -72,6 +72,15 @@ computador.
 > cada atualização, refazendo toda a liberação de acessibilidade. Ela não é chave
 > de publicação em loja e não protege nada sigiloso.
 
+## 🔌 Ligando e desligando
+
+O interruptor no topo da tela liga e desliga o Farol na hora — desligado, nenhum
+cartão aparece e as suas metas continuam guardadas.
+
+Também há um **atalho na aba de notificações**: puxe a barra de status, toque em
+editar (o lápis ou ⋮) e arraste o bloco **Farol** para os atalhos ativos. Dali dá
+para desligar com um toque, sem abrir o app.
+
 ## ⚙️ Configurando
 
 Abra o app e ajuste:
@@ -85,8 +94,11 @@ Abra o app e ajuste:
 - **Locais de risco** — palavras separadas por vírgula. Se aparecerem no endereço
   da oferta, o card acende alerta.
 
-Use o botão **"Testar com uma oferta de exemplo"** pra ver se as suas metas
-estão fazendo sentido antes de sair rodando.
+No topo da tela há uma **prévia do cartão** com os três estados (Aceitar,
+Atenção, Recusar). Ela usa o mesmo código que desenha o cartão na rua, e os
+números seguem as metas que você digitou — então dá para calibrar tudo antes
+mesmo de liberar a acessibilidade. O botão **"Ver a conta desse cartão"** abre a
+matemática por trás do cartão que está na prévia.
 
 ## 🔧 Se ele não estiver lendo a oferta
 
@@ -108,7 +120,9 @@ padrões em `OfferParser.kt`.
 | `OfferParser.kt` | Extrai valor, km, minutos e nota do texto lido |
 | `OfferEvaluator.kt` | Calcula R$/km, R$/h, combustível e decide a cor |
 | `Settings.kt` | Suas metas, guardadas no aparelho |
-| `MainActivity.kt` | Tela de configuração |
+| `CardRenderer.kt` | Desenha o cartão — usado pela sobreposição e pela prévia |
+| `MainActivity.kt` | Tela de configuração e prévia |
+| `FarolTileService.kt` | Atalho de liga/desliga na aba de notificações |
 
 A leitura é feita com dois cuidados de performance: as mudanças de tela são
 agrupadas num intervalo de 250 ms, e uma oferta já avaliada não é recalculada

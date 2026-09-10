@@ -64,6 +64,16 @@ data class Settings(
             }.apply()
         }
 
+        /**
+         * Liga e desliga o Farol sem tocar nas outras configuracoes.
+         * O servico observa as preferencias, entao o efeito e imediato.
+         */
+        fun setEnabled(ctx: Context, value: Boolean) {
+            prefs(ctx).edit().putBoolean("enabled", value).apply()
+        }
+
+        fun isEnabled(ctx: Context): Boolean = prefs(ctx).getBoolean("enabled", true)
+
         /** Último texto lido da tela — usado pelo modo aprendizado. */
         fun saveLastCapture(ctx: Context, pkg: String, text: String) {
             prefs(ctx).edit()
