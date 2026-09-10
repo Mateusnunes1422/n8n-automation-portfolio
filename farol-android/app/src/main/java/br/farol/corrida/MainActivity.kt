@@ -13,6 +13,8 @@ import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import com.google.android.material.materialswitch.MaterialSwitch
 
 class MainActivity : AppCompatActivity() {
@@ -28,9 +30,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusAcc: TextView
     private lateinit var statusOverlay: TextView
     private lateinit var previewCard: View
+    private lateinit var headerPill: TextView
     private var previewLevel = Level.GREEN
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // O cartao que o Farol desenha e escuro; a tela de ajuste segue o mesmo
+        // mundo, independente do tema do aparelho.
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
@@ -44,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         learnMode = findViewById(R.id.learnMode)
         statusAcc = findViewById(R.id.statusAcc)
         statusOverlay = findViewById(R.id.statusOverlay)
+        headerPill = findViewById(R.id.headerPill)
 
         findViewById<Button>(R.id.btnAcc).setOnClickListener {
             startActivity(Intent(AndroidSettings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -126,9 +133,10 @@ class MainActivity : AppCompatActivity() {
             R.id.tabYellow to Level.YELLOW,
             R.id.tabRed to Level.RED
         ).forEach { (id, level) ->
-            findViewById<TextView>(id).setBackgroundResource(
-                if (level == previewLevel) R.drawable.bg_chip_on else R.drawable.bg_chip
-            )
+            val chip = findViewById<TextView>(id)
+            val on = level == previewLevel
+            chip.setBackgroundResource(if (on) R.drawable.bg_chip_on else R.drawable.bg_chip)
+            chip.setTextColor(ContextCompat.getColor(this, if (on) R.color.accent else R.color.ink_dim))
         }
     }
 
@@ -199,11 +207,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshStatus() {
         val accOn = isAccessibilityEnabled(this)
-        statusAcc.text = if (accOn) "✅ Leitura de tela ligada" else "❌ Leitura de tela desligada"
-
         val overlayOn = AndroidSettings.canDrawOverlays(this)
-        statusOverlay.text =
-            if (overlayOn) "✅ Sobreposição permitida" else "❌ Sobreposição não permitida"
+
+        statusLine(statusAcc, accOn, "Leitura de tela ligada", "Leitura de tela desligada")
+        statusLine(statusOverlay, overlayOn, "Sobreposição permitida", "Sobreposição não permitida")
+
+        val pronto = accOn && overlayOn
+        headerPill.text = if (pronto) "● no ar" else "● falta liberar"
+        headerPill.setTextColor(
+            ContextCompat.getColor(this, if (pronto) R.color.accent else R.color.lvl_yellow)
+        )
+    }
+
+    private fun statusLine(view: TextView, ok: Boolean, yes: String, no: String) {
+        view.text = if (ok) "● $yes" else "● $no"
+        view.setTextColor(ContextCompat.getColor(this, if (ok) R.color.accent else R.color.lvl_red))
     }
 
     private fun isAccessibilityEnabled(ctx: Context): Boolean {

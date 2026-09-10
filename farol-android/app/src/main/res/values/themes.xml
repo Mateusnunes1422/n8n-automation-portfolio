@@ -1,7 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Farol" parent="Theme.Material3.DayNight">
-        <item name="colorPrimary">@color/farol_primary</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
+    <!-- O Farol assume o tema escuro sempre: o cartao que ele desenha por cima
+         do app de corrida e escuro, entao a tela de ajuste mostra o mesmo mundo. -->
+    <style name="Theme.Farol" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">@color/ink_on_accent</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/ink</item>
+        <item name="android:colorBackground">@color/bg</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
+        <item name="android:textColorPrimary">@color/ink</item>
+        <item name="android:textColorSecondary">@color/ink_dim</item>
+        <item name="android:textColorHint">@color/ink_dim</item>
     </style>
 </resources>

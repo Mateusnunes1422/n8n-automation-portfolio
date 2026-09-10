@@ -1,17 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="farol_primary">#1B6B4C</color>
-    <color name="ic_launcher_background">#0E3D2B</color>
+    <!-- Fundo e superficies -->
+    <color name="bg">#0A0B0D</color>
+    <color name="surface">#15171C</color>
+    <color name="surface_hi">#1C1F26</color>
+    <color name="stroke">#282C35</color>
+
+    <!-- Texto -->
+    <color name="ink">#F3F5F8</color>
+    <color name="ink_dim">#8B93A1</color>
+    <color name="ink_on_accent">#04241A</color>
+
+    <!-- Acento -->
+    <color name="accent">#16C47F</color>
+    <color name="accent_dim">#0E3A2A</color>
 
     <!-- Cartao sobreposto -->
     <color name="card_bg">#0F1218</color>
-    <color name="card_label">#9AA4B2</color>
+    <color name="card_label">#8B93A1</color>
     <color name="card_value">#FFFFFF</color>
     <color name="badge_bg">#252B36</color>
 
     <!-- Semaforo por metrica -->
-    <color name="lvl_green">#22C55E</color>
-    <color name="lvl_yellow">#EAB308</color>
-    <color name="lvl_red">#EF4444</color>
-    <color name="lvl_none">#4B5563</color>
+    <color name="lvl_green">#16C47F</color>
+    <color name="lvl_yellow">#F0B429</color>
+    <color name="lvl_red">#F04438</color>
+    <color name="lvl_none">#4A5160</color>
+
+    <color name="ic_launcher_background">#0E3D2B</color>
 </resources>

@@ -1,24 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+
+    <!-- Cartao que agrupa uma secao de ajustes -->
+    <style name="FarolCard" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:background">@drawable/bg_surface</item>
+        <item name="android:padding">18dp</item>
+        <item name="android:layout_marginBottom">14dp</item>
+    </style>
+
+    <!-- Rotulo de secao: maiuscula, pequeno, espacado -->
     <style name="FarolSection" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textSize">17sp</item>
+        <item name="android:textSize">11sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:textColor">@color/ink_dim</item>
+        <item name="android:letterSpacing">0.14</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:layout_marginBottom">14dp</item>
     </style>
 
     <style name="FarolLabel" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">13sp</item>
+        <item name="android:textColor">@color/ink_dim</item>
+        <item name="android:layout_marginTop">14dp</item>
+        <item name="android:layout_marginBottom">6dp</item>
+    </style>
+
+    <style name="FarolHint" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/ink_dim</item>
+        <item name="android:lineSpacingExtra">2dp</item>
         <item name="android:layout_marginTop">8dp</item>
     </style>
 
-    <style name="FarolInput" parent="Widget.AppCompat.EditText">
+    <style name="FarolInput" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:textSize">17sp</item>
+        <item name="android:background">@drawable/bg_input</item>
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textColorHint">@color/ink_dim</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:paddingStart">14dp</item>
+        <item name="android:paddingEnd">14dp</item>
+        <item name="android:paddingTop">13dp</item>
+        <item name="android:paddingBottom">13dp</item>
     </style>
 
     <style name="FarolChip" parent="">
@@ -27,9 +61,18 @@
         <item name="android:layout_weight">1</item>
         <item name="android:background">@drawable/bg_chip</item>
         <item name="android:gravity">center</item>
-        <item name="android:paddingTop">9dp</item>
-        <item name="android:paddingBottom">9dp</item>
+        <item name="android:paddingTop">11dp</item>
+        <item name="android:paddingBottom">11dp</item>
         <item name="android:textSize">13sp</item>
-        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/ink_dim</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="FarolSwitch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/ink</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:minHeight">48dp</item>
     </style>
 </resources>
