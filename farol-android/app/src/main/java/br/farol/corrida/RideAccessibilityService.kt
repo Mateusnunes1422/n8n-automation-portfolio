@@ -18,8 +18,12 @@ import android.view.accessibility.AccessibilityNodeInfo
 /**
  * Le o texto da oferta na tela do app de corrida e mostra o cartao por cima.
  *
- * A sobreposicao e declarada NOT_TOUCHABLE: ela nunca cobre nem intercepta o
- * botao de aceitar. O app so informa; quem decide e o motorista.
+ * O cartao ocupa apenas uma faixa no alto da tela e recebe toque so dentro
+ * dela: um toque ali dispensa o cartao, e todo o resto da tela continua indo
+ * direto para o app de corrida. Ele tambem se apaga sozinho em 5 segundos e
+ * sai da hierarquia de janelas quando some, para nao sobrar nada por cima.
+ *
+ * O app so informa; ele nunca aceita corrida por voce.
  */
 class RideAccessibilityService : AccessibilityService() {
 
@@ -31,10 +35,14 @@ class RideAccessibilityService : AccessibilityService() {
     private var lastSignature: String? = null
     private var lastSeenAt = 0L
     private var pendingScan: Runnable? = null
+    private var autoHide: Runnable? = null
 
     companion object {
         private const val DEBOUNCE_MS = 250L
         private const val HIDE_AFTER_MS = 2500L
+
+        /** O cartao se apaga sozinho depois disso, mesmo com a oferta na tela. */
+        private const val AUTO_HIDE_MS = 5_000L
         private const val MAX_NODES = 400
     }
 
@@ -140,6 +148,10 @@ class RideAccessibilityService : AccessibilityService() {
         val wm = windowManager ?: return null
 
         val view = LayoutInflater.from(this).inflate(R.layout.overlay_card, null)
+
+        // Um toque em qualquer ponto do cartao dispensa ele.
+        view.setOnClickListener { hideOverlay() }
+
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -147,9 +159,10 @@ class RideAccessibilityService : AccessibilityService() {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-            // Nunca rouba o toque: o botao de aceitar continua funcionando.
+            // NOT_TOUCH_MODAL deixa passar tudo que cair fora do cartao, e o
+            // cartao ocupa so uma faixa no alto. Sem NOT_FOCUSABLE ele roubaria
+            // o teclado do app de baixo.
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
             PixelFormat.TRANSLUCENT
         ).apply {
@@ -170,11 +183,24 @@ class RideAccessibilityService : AccessibilityService() {
         val view = ensureOverlay() ?: return
         CardRenderer.render(view, badgeFor(pkg), v)
         view.visibility = View.VISIBLE
+        scheduleAutoHide()
     }
 
-    private fun hideOverlay() { overlay?.visibility = View.GONE }
+    private fun scheduleAutoHide() {
+        autoHide?.let { handler.removeCallbacks(it) }
+        val r = Runnable { hideOverlay() }
+        autoHide = r
+        handler.postDelayed(r, AUTO_HIDE_MS)
+    }
 
-    private fun removeOverlay() {
+    /**
+     * Tira o cartao da tela de verdade, em vez de so deixar invisivel: como a
+     * janela agora recebe toques, uma janela esquecida por cima continuaria
+     * engolindo o que fosse tocado ali.
+     */
+    private fun hideOverlay() {
+        autoHide?.let { handler.removeCallbacks(it) }
+        autoHide = null
         overlay?.let { v -> try { windowManager?.removeView(v) } catch (_: Exception) {} }
         overlay = null
     }
@@ -184,7 +210,7 @@ class RideAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         pendingScan?.let { handler.removeCallbacks(it) }
         Settings.prefs(this).unregisterOnSharedPreferenceChangeListener(prefsListener)
-        removeOverlay()
+        hideOverlay()
         super.onDestroy()
     }
 }

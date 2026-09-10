@@ -38,10 +38,23 @@ Cores de cada barra: 🟢 bateu a meta · 🟡 chegou perto (a partir de 85% del
 A **borda do cartão** dá o veredito geral, e uma linha de alerta aparece embaixo
 quando o endereço bate com uma palavra de risco que você cadastrou.
 
+## ⏱️ Quanto tempo o cartão fica
+
+O cartão **se apaga sozinho em 5 segundos**, e um **toque nele o dispensa na hora**.
+Quando some, ele sai da hierarquia de janelas — não fica uma janela invisível por
+cima da tela.
+
+Ele ocupa apenas uma faixa no alto e recebe toque só dentro dela: qualquer toque
+fora do cartão vai direto para o app de corrida. Ainda assim, enquanto o cartão
+está visível, essa faixa do topo é dele — se algo do app de corrida estiver bem
+ali, o primeiro toque dispensa o cartão e o segundo chega ao app.
+
+Para mudar os 5 segundos, ajuste `AUTO_HIDE_MS` em `RideAccessibilityService.kt`.
+
 ## ⚠️ O que ele NÃO faz
 
-**Não aceita corrida por você.** O card é declarado como "não tocável" no Android —
-ele nunca cobre nem intercepta o botão de aceitar. Quem decide é você.
+**Não aceita corrida por você.** O Farol lê, calcula e mostra — a decisão e o
+toque são sempre seus.
 
 Isso é de propósito: automatizar o aceite viola os termos do Uber e da 99, pode
 te render banimento e é perigoso enquanto se dirige.
