@@ -62,9 +62,15 @@ computador.
    - **Leitura de tela** (Acessibilidade → Apps instalados → Farol → ativar)
    - **Sobrepor outros apps**
 
-> Já tem uma versão instalada? Desinstale antes de atualizar — cada build é
-> assinado com uma chave de debug diferente, então o Android recusa a atualização
-> por cima.
+> **Atualizando:** a partir da versão 1.0.5 todos os builds usam a mesma chave de
+> assinatura (`farol-dev.keystore`, versionada no repositório), então basta baixar
+> o APK novo e instalar por cima — o app mantém as permissões e as suas metas.
+> Só quem está numa versão anterior a essa precisa desinstalar uma última vez.
+>
+> Essa chave é de desenvolvimento e está no repositório de propósito: sem ela cada
+> build sairia com assinatura diferente e o Android exigiria desinstalar o app a
+> cada atualização, refazendo toda a liberação de acessibilidade. Ela não é chave
+> de publicação em loja e não protege nada sigiloso.
 
 ## ⚙️ Configurando
 

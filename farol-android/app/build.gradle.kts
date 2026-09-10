@@ -11,17 +11,33 @@ android {
         applicationId = "br.farol.corrida"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // Cada build do CI vira uma versao maior, para o Android aceitar a
+        // atualizacao por cima da anterior.
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+        versionName = "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
+    }
+
+    signingConfigs {
+        // Chave fixa de desenvolvimento, versionada de proposito. Sem ela cada
+        // build sairia com uma assinatura diferente e o Android exigiria
+        // desinstalar o app (perdendo as permissoes) a cada atualizacao.
+        // Nao e uma chave de publicacao em loja e nao protege nada sigiloso.
+        create("shared") {
+            storeFile = file("../farol-dev.keystore")
+            storePassword = "farolapp"
+            keyAlias = "farol"
+            keyPassword = "farolapp"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Assinado com a chave de debug para permitir instalação direta do APK
-            // gerado pelo GitHub Actions, sem precisar criar uma keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("shared")
         }
     }
 
