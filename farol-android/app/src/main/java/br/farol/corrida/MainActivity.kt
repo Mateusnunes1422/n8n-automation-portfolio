@@ -119,11 +119,13 @@ class MainActivity : AppCompatActivity() {
                 Level.GREEN -> "ACEITAR (verde)"
                 Level.YELLOW -> "AVALIAR (amarelo)"
                 Level.RED -> "RECUSAR (vermelho)"
+                Level.NONE -> "SEM DADOS (cinza)"
             }
         ).append("\n\n")
         v.rsPerKm?.let { sb.append("R$/km: ").append("%.2f".format(it).replace(".", ",")).append("\n") }
         v.rsPerHour?.let { sb.append("R$/hora: ").append("%.2f".format(it).replace(".", ",")).append("\n") }
         v.fuelCost?.let { sb.append("Combustível: ").append(OfferEvaluator.fmt(it)).append("\n") }
+        v.profitPct?.let { sb.append("Lucro: ").append("%.0f".format(it)).append("%\n") }
         v.netProfit?.let { sb.append("Líquido: ").append(OfferEvaluator.fmt(it)).append("\n") }
         if (v.reasons.isNotEmpty()) sb.append("\n").append(v.reasons.joinToString("\n") { "• $it" })
         if (v.alerts.isNotEmpty()) sb.append("\n\n⚠ ").append(v.alerts.joinToString("\n⚠ "))

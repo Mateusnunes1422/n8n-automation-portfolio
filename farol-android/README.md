@@ -8,21 +8,35 @@ Sem mensalidade, sem cadastro, sem anúncio. Tudo fica no seu celular.
 
 ## O que ele mostra
 
-Quando a oferta aparece, um card sobe no topo da tela com:
+Quando a oferta aparece, um cartão sobe no topo da tela:
 
-- **R$/km** em destaque
-- **R$/hora**, distância total, tempo total e valor da corrida
-- **Quanto sobra limpo** depois do combustível
-- **Alerta** se o endereço bater com uma palavra de risco que você cadastrou
-- O veredito: **ACEITAR**, **AVALIAR** ou **RECUSAR**
+```
+┌────────────────────────────────────────────────┐  ← borda = veredito geral
+│ [Uber]  12,4 km · 22 min                       │
+│                                                 │
+│ R$/Km      R$/Hora     Nota       Lucro %      │
+│ ▌2,00      ▌68         ▌4,92      ▌49          │
+└────────────────────────────────────────────────┘
+   ↑ vermelho  ↑ amarelo  ↑ verde    ↑ cinza
+```
 
-O semáforo usa **as suas metas**, não a média do aplicativo:
+Cada métrica tem **a sua própria barra colorida**. Isso é o ponto: você bate o
+olho e sabe *qual* número está puxando a corrida pra baixo, em vez de só receber
+um veredito fechado. No exemplo acima o R$/km está ruim, mas o R$/hora está
+razoável — é uma corrida curta e bem paga por minuto.
 
-| Cor | Quando |
-|---|---|
-| 🟢 Verde | R$/km **e** R$/hora acima das suas metas, sem alertas |
-| 🟡 Amarelo | Só uma das duas metas atendida |
-| 🔴 Vermelho | Nenhuma meta atendida, ou não paga nem o combustível, ou local de risco |
+| Métrica | O que é | Fica verde quando |
+|---|---|---|
+| **R$/Km** | Valor dividido pela distância total | Bate a sua meta de R$/km |
+| **R$/Hora** | Valor projetado por hora | Bate a sua meta de R$/hora |
+| **Nota** | Nota do passageiro | Igual ou acima da sua mínima |
+| **Lucro %** | Quanto sobra do valor depois do combustível | 65% ou mais |
+
+Cores de cada barra: 🟢 bateu a meta · 🟡 chegou perto (a partir de 85% dela)
+· 🔴 ficou longe · ⚪ cinza quando não há dado ou você não configurou aquela meta.
+
+A **borda do cartão** dá o veredito geral, e uma linha de alerta aparece embaixo
+quando o endereço bate com uma palavra de risco que você cadastrou.
 
 ## ⚠️ O que ele NÃO faz
 

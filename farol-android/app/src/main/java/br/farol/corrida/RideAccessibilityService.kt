@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -15,12 +16,13 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 
 /**
- * Lê o texto da oferta na tela do app de corrida e mostra o semáforo por cima.
+ * Le o texto da oferta na tela do app de corrida e mostra o cartao por cima.
  *
- * Não toca em nada: a sobreposição é declarada como NOT_TOUCHABLE, então nunca
- * bloqueia o botão de aceitar. Quem decide é o motorista.
+ * A sobreposicao e declarada NOT_TOUCHABLE: ela nunca cobre nem intercepta o
+ * botao de aceitar. O app so informa; quem decide e o motorista.
  */
 class RideAccessibilityService : AccessibilityService() {
 
@@ -37,11 +39,13 @@ class RideAccessibilityService : AccessibilityService() {
         private const val DEBOUNCE_MS = 250L
         private const val HIDE_AFTER_MS = 2500L
         private const val MAX_NODES = 400
+        private const val CORNER_DP = 18f
+        private const val BORDER_DP = 3f
     }
 
     /**
-     * Recarrega as metas só quando o motorista muda alguma coisa na tela de
-     * configuração. Ler as preferências a cada evento de tela seria desperdício:
+     * Recarrega as metas so quando o motorista muda alguma coisa na tela de
+     * configuracao. Ler as preferencias a cada evento de tela seria desperdicio:
      * o Android dispara dezenas deles por segundo.
      */
     private val prefsListener =
@@ -63,9 +67,9 @@ class RideAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         val monitored = pkg in cfg.monitoredPackages
 
-        // Fora do modo aprendizado só olhamos os apps de corrida conhecidos.
+        // Fora do modo aprendizado so olhamos os apps de corrida conhecidos.
         // Com ele ligado olhamos qualquer tela, para descobrir o nome do pacote
-        // quando o Uber ou a 99 aparecem com um pacote que ainda não está na lista.
+        // quando o Uber ou a 99 aparecem com um pacote que ainda nao esta na lista.
         if (!monitored && !cfg.learnMode) return
 
         when (event.eventType) {
@@ -89,21 +93,20 @@ class RideAccessibilityService : AccessibilityService() {
 
         if (cfg.learnMode) {
             val joined = texts.joinToString("\n")
-            // Numa tela de app desconhecido, só guarda se parecer uma oferta.
-            // Evita registrar tela de banco, conversa e afins enquanto diagnostica.
+            // Numa tela de app desconhecido, so guarda se parecer uma oferta.
+            // Evita registrar tela de banco, conversa e afins durante o diagnostico.
             if (monitored || joined.contains("R$")) {
                 Settings.saveLastCapture(this, pkg, joined)
             }
         }
 
-        // Card só aparece nos apps de corrida conhecidos.
+        // Cartao so aparece nos apps de corrida conhecidos.
         if (!monitored) return
 
         val offer = OfferParser.parse(texts)
         val now = System.currentTimeMillis()
 
         if (!offer.isUsable) {
-            // A oferta sumiu da tela — esconde depois de um instante.
             if (now - lastSeenAt > HIDE_AFTER_MS) {
                 hideOverlay()
                 lastSignature = null
@@ -112,14 +115,13 @@ class RideAccessibilityService : AccessibilityService() {
         }
 
         lastSeenAt = now
-        if (offer.signature == lastSignature) return   // mesma oferta, já mostrada
+        if (offer.signature == lastSignature) return   // mesma oferta, ja mostrada
         lastSignature = offer.signature
 
-        val verdict = OfferEvaluator.evaluate(offer, cfg)
-        showOverlay(offer, verdict)
+        showOverlay(pkg, OfferEvaluator.evaluate(offer, cfg))
     }
 
-    /** Percorre a árvore de nós juntando todo texto visível. */
+    /** Percorre a arvore de nos juntando todo texto visivel. */
     private fun collectText(node: AccessibilityNodeInfo?, out: MutableList<String>, depth: Int) {
         if (node == null || depth > 40 || out.size > MAX_NODES) return
         node.text?.toString()?.takeIf { it.isNotBlank() }?.let { out += it }
@@ -127,65 +129,86 @@ class RideAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) collectText(node.getChild(i), out, depth + 1)
     }
 
-    // ---------------- Sobreposição ----------------
+    // ---------------- Sobreposicao ----------------
 
-    private fun showOverlay(offer: Offer, v: Verdict) {
-        if (!AndroidSettings.canDrawOverlays(this)) return
-        val wm = windowManager ?: return
+    private fun dp(v: Float) = v * resources.displayMetrics.density
 
-        if (overlay == null) {
-            val view = LayoutInflater.from(this).inflate(R.layout.overlay_card, null)
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                else
-                    @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
-                // Nunca rouba o toque: o botão de aceitar continua funcionando.
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP
-                y = 40
-            }
-            try {
-                wm.addView(view, params)
-                overlay = view
-            } catch (e: Exception) {
-                return
-            }
+    private fun colorOf(level: Level) = ContextCompat.getColor(
+        this,
+        when (level) {
+            Level.GREEN -> R.color.lvl_green
+            Level.YELLOW -> R.color.lvl_yellow
+            Level.RED -> R.color.lvl_red
+            Level.NONE -> R.color.lvl_none
+        }
+    )
+
+    private fun badgeFor(pkg: String) = when {
+        pkg.contains("ubercab") -> "Uber"
+        pkg.contains("99") || pkg.contains("taxi") -> "99"
+        else -> "App"
+    }
+
+    private fun ensureOverlay(): View? {
+        overlay?.let { return it }
+        if (!AndroidSettings.canDrawOverlays(this)) return null
+        val wm = windowManager ?: return null
+
+        val view = LayoutInflater.from(this).inflate(R.layout.overlay_card, null)
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE,
+            // Nunca rouba o toque: o botao de aceitar continua funcionando.
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP
+            y = dp(40f).toInt()
         }
 
-        val view = overlay ?: return
-        val bg = when (v.level) {
-            Level.GREEN -> R.drawable.bg_verdict_green
-            Level.YELLOW -> R.drawable.bg_verdict_yellow
-            Level.RED -> R.drawable.bg_verdict_red
+        return try {
+            wm.addView(view, params)
+            overlay = view
+            view
+        } catch (e: Exception) {
+            null
         }
-        view.findViewById<View>(R.id.card).setBackgroundResource(bg)
+    }
 
-        view.findViewById<TextView>(R.id.verdict).text = when (v.level) {
-            Level.GREEN -> "ACEITAR"
-            Level.YELLOW -> "AVALIAR"
-            Level.RED -> "RECUSAR"
+    private fun showOverlay(pkg: String, v: Verdict) {
+        val view = ensureOverlay() ?: return
+
+        // Fundo escuro com borda na cor do veredito geral.
+        val bg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(CORNER_DP)
+            setColor(ContextCompat.getColor(this@RideAccessibilityService, R.color.card_bg))
+            setStroke(dp(BORDER_DP).toInt(), colorOf(v.level))
         }
+        view.findViewById<View>(R.id.card).background = bg
 
-        view.findViewById<TextView>(R.id.perKm).text =
-            v.rsPerKm?.let { "R$ %.2f/km".format(it).replace(".", ",") } ?: "—"
+        view.findViewById<TextView>(R.id.appBadge).text = badgeFor(pkg)
 
-        val perHour = v.rsPerHour?.let { "R$ %.0f/h".format(it) } ?: "—"
-        val dist = "%.1f km".format(v.totalKm).replace(".", ",")
-        view.findViewById<TextView>(R.id.details).text =
-            "$perHour  ·  $dist  ·  ${v.totalMin} min  ·  ${OfferEvaluator.fmt(offer.fare ?: 0.0)}"
+        val km = "%.1f".format(v.totalKm).replace(".", ",")
+        view.findViewById<TextView>(R.id.headline).text = "$km km · ${v.totalMin} min"
 
-        val profitView = view.findViewById<TextView>(R.id.profit)
-        if (v.netProfit != null) {
-            profitView.visibility = View.VISIBLE
-            profitView.text = "Líquido s/ combustível ≈ ${OfferEvaluator.fmt(v.netProfit)}"
-        } else profitView.visibility = View.GONE
+        setMetric(view, R.id.kmBar, R.id.kmValue, v.kmLevel,
+            v.rsPerKm?.let { "%.2f".format(it).replace(".", ",") })
+
+        setMetric(view, R.id.hourBar, R.id.hourValue, v.hourLevel,
+            v.rsPerHour?.let { "%.0f".format(it) })
+
+        setMetric(view, R.id.ratingBar, R.id.ratingValue, v.ratingLevel,
+            v.rating?.let { OfferEvaluator.fmtRating(it) })
+
+        setMetric(view, R.id.profitBar, R.id.profitValue, v.profitLevel,
+            v.profitPct?.let { "%.0f".format(it) })
 
         val alertView = view.findViewById<TextView>(R.id.alert)
         if (v.alerts.isNotEmpty()) {
@@ -196,9 +219,12 @@ class RideAccessibilityService : AccessibilityService() {
         view.visibility = View.VISIBLE
     }
 
-    private fun hideOverlay() {
-        overlay?.let { it.visibility = View.GONE }
+    private fun setMetric(root: View, barId: Int, valueId: Int, level: Level, text: String?) {
+        root.findViewById<View>(barId).setBackgroundColor(colorOf(level))
+        root.findViewById<TextView>(valueId).text = text ?: "--"
     }
+
+    private fun hideOverlay() { overlay?.visibility = View.GONE }
 
     private fun removeOverlay() {
         overlay?.let { v -> try { windowManager?.removeView(v) } catch (_: Exception) {} }

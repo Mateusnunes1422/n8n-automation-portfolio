@@ -175,4 +175,48 @@ class OfferEvaluatorTest {
         assertTrue(v.alerts.isNotEmpty())
         assertTrue(v.level != Level.GREEN)
     }
+
+    @Test
+    fun `cada metrica ganha sua propria cor`() {
+        // R$/km 2,00 (meta 1,60 -> verde) mas R$/hora 24 (meta 30 -> vermelho)
+        val v = OfferEvaluator.evaluate(offer(20.0, 2.0, 10, 8.0, 40), base)
+        assertEquals(Level.GREEN, v.kmLevel)
+        assertEquals(Level.RED, v.hourLevel)
+    }
+
+    @Test
+    fun `chegar perto da meta fica amarelo`() {
+        // 1,45/km contra meta de 1,60 = 90% dela, dentro da tolerancia
+        val v = OfferEvaluator.evaluate(offer(14.5, 0.0, 0, 10.0, 20), base)
+        assertEquals(Level.YELLOW, v.kmLevel)
+    }
+
+    @Test
+    fun `meta nao configurada deixa a barra cinza`() {
+        // minRating = 0 significa "nao me importo com nota"
+        val v = OfferEvaluator.evaluate(offer(40.0, 2.1, 6, 8.4, 24, rating = 3.0), base)
+        assertEquals(Level.NONE, v.ratingLevel)
+    }
+
+    @Test
+    fun `sem nota na oferta a barra fica cinza`() {
+        val v = OfferEvaluator.evaluate(offer(40.0, 2.1, 6, 8.4, 24), base.copy(minRating = 4.7))
+        assertEquals(Level.NONE, v.ratingLevel)
+    }
+
+    @Test
+    fun `calcula a margem de lucro em porcentagem`() {
+        // 12 km a 12 km/l a R$ 6 = R$ 6 de combustivel numa corrida de R$ 30
+        // Sobram R$ 24, ou seja 80% do valor
+        val v = OfferEvaluator.evaluate(offer(30.0, 2.0, 5, 10.0, 25), base)
+        assertEquals(80.0, v.profitPct!!, 0.1)
+        assertEquals(Level.GREEN, v.profitLevel)
+    }
+
+    @Test
+    fun `margem apertada deixa o lucro vermelho`() {
+        // 40 km consomem R$ 20 de combustivel numa corrida de R$ 32: sobra 37%
+        val v = OfferEvaluator.evaluate(offer(32.0, 0.0, 0, 40.0, 60), base)
+        assertEquals(Level.RED, v.profitLevel)
+    }
 }
