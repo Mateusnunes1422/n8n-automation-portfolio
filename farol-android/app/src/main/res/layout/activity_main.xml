@@ -24,6 +24,46 @@
             android:text="Mostra na hora se a corrida vale a pena, por cima do Uber e da 99."
             android:textSize="14sp" />
 
+
+        <!-- ===== Prévia do cartão ===== -->
+        <TextView style="@style/FarolSection" android:text="Como o cartão aparece" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="10dp">
+
+            <TextView
+                android:id="@+id/tabGreen"
+                style="@style/FarolChip"
+                android:text="Aceitar" />
+
+            <TextView
+                android:id="@+id/tabYellow"
+                style="@style/FarolChip"
+                android:layout_marginStart="6dp"
+                android:text="Atenção" />
+
+            <TextView
+                android:id="@+id/tabRed"
+                style="@style/FarolChip"
+                android:layout_marginStart="6dp"
+                android:text="Recusar" />
+        </LinearLayout>
+
+        <include
+            android:id="@+id/previewCard"
+            layout="@layout/overlay_card" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="20dp"
+            android:text="É esse mesmo cartão que aparece por cima do Uber e da 99. Os números seguem as metas que você configurar abaixo."
+            android:textSize="12sp" />
+
         <!-- ===== Permissões ===== -->
         <TextView style="@style/FarolSection" android:text="1. Permissões" />
 
@@ -164,7 +204,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:text="Testar com uma oferta de exemplo" />
+            android:text="Ver a conta desse cartão" />
 
         <Button
             android:id="@+id/btnSave"

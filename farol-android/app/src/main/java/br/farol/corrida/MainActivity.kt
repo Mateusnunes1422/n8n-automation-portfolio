@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.provider.Settings as AndroidSettings
 import android.text.TextUtils
 import android.widget.Button
@@ -26,6 +27,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var learnMode: MaterialSwitch
     private lateinit var statusAcc: TextView
     private lateinit var statusOverlay: TextView
+    private lateinit var previewCard: View
+    private var previewLevel = Level.GREEN
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,11 +56,24 @@ class MainActivity : AppCompatActivity() {
                 )
             )
         }
-        findViewById<Button>(R.id.btnSave).setOnClickListener { save(); showSaved() }
+        previewCard = findViewById(R.id.previewCard)
+        mapOf(
+            R.id.tabGreen to Level.GREEN,
+            R.id.tabYellow to Level.YELLOW,
+            R.id.tabRed to Level.RED
+        ).forEach { (id, level) ->
+            findViewById<TextView>(id).setOnClickListener {
+                previewLevel = level
+                refreshPreview()
+            }
+        }
+
+        findViewById<Button>(R.id.btnSave).setOnClickListener { save(); showSaved(); refreshPreview() }
         findViewById<Button>(R.id.btnTest).setOnClickListener { save(); runTest() }
         findViewById<Button>(R.id.btnCapture).setOnClickListener { showCapture() }
 
         loadIntoFields()
+        refreshPreview()
     }
 
     override fun onResume() {
@@ -77,22 +93,43 @@ class MainActivity : AppCompatActivity() {
         learnMode.isChecked = s.learnMode
     }
 
-    private fun save() {
+    /** Le as metas direto dos campos, para a previa refletir o que esta na tela. */
+    private fun fieldSettings(): Settings {
         val old = Settings.load(this)
-        Settings.save(
-            this,
-            old.copy(
-                minRsPerKm = num(minKm) ?: old.minRsPerKm,
-                minRsPerHour = num(minHour) ?: old.minRsPerHour,
-                kmPerLiter = num(kmPerLiter) ?: old.kmPerLiter,
-                fuelPrice = num(fuelPrice) ?: old.fuelPrice,
-                minRating = num(minRating) ?: 0.0,
-                riskWords = riskWords.text.toString()
-                    .split(",").map { it.trim() }.filter { it.isNotEmpty() },
-                countPickup = countPickup.isChecked,
-                learnMode = learnMode.isChecked
-            )
+        return old.copy(
+            minRsPerKm = num(minKm) ?: old.minRsPerKm,
+            minRsPerHour = num(minHour) ?: old.minRsPerHour,
+            kmPerLiter = num(kmPerLiter) ?: old.kmPerLiter,
+            fuelPrice = num(fuelPrice) ?: old.fuelPrice,
+            minRating = num(minRating) ?: 0.0,
+            riskWords = riskWords.text.toString()
+                .split(",").map { it.trim() }.filter { it.isNotEmpty() },
+            countPickup = countPickup.isChecked,
+            learnMode = learnMode.isChecked
         )
+    }
+
+    private fun save() = Settings.save(this, fieldSettings())
+
+    /**
+     * Mostra o cartao real com uma oferta de exemplo no estado escolhido.
+     * Usa o mesmo CardRenderer da sobreposicao, entao a previa nao pode
+     * divergir do que aparece na rua.
+     */
+    private fun refreshPreview() {
+        val cfg = fieldSettings()
+        val offer = CardRenderer.sampleOffer(cfg, previewLevel)
+        CardRenderer.render(previewCard, "Uber", OfferEvaluator.evaluate(offer, cfg))
+
+        listOf(
+            R.id.tabGreen to Level.GREEN,
+            R.id.tabYellow to Level.YELLOW,
+            R.id.tabRed to Level.RED
+        ).forEach { (id, level) ->
+            findViewById<TextView>(id).setBackgroundResource(
+                if (level == previewLevel) R.drawable.bg_chip_on else R.drawable.bg_chip
+            )
+        }
     }
 
     private fun showSaved() {
@@ -103,34 +140,42 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    /** Roda o cálculo numa oferta de exemplo, pra conferir se as metas fazem sentido. */
+    /** Abre a conta por tras do cartao que esta na previa. */
     private fun runTest() {
-        val cfg = Settings.load(this)
-        val exemplo = Offer(
-            fare = 21.50, pickupMin = 6, pickupKm = 2.1,
-            tripMin = 19, tripKm = 8.4, rating = 4.82,
-            lines = listOf("R$ 21,50", "6 min (2,1 km)", "19 min (8,4 km)", "4,82")
-        )
-        val v = OfferEvaluator.evaluate(exemplo, cfg)
+        val cfg = fieldSettings()
+        val offer = CardRenderer.sampleOffer(cfg, previewLevel)
+        val v = OfferEvaluator.evaluate(offer, cfg)
+
         val sb = StringBuilder()
-        sb.append("Oferta de exemplo: R$ 21,50 · 2,1 km até o passageiro · 8,4 km de viagem · 25 min\n\n")
+        sb.append("Oferta de exemplo: ").append(OfferEvaluator.fmt(offer.fare ?: 0.0))
+            .append(" · ").append("%.1f".format(v.totalKm).replace(".", ","))
+            .append(" km · ").append(v.totalMin).append(" min\n\n")
+
         sb.append("Veredito: ").append(
             when (v.level) {
-                Level.GREEN -> "ACEITAR (verde)"
-                Level.YELLOW -> "AVALIAR (amarelo)"
-                Level.RED -> "RECUSAR (vermelho)"
-                Level.NONE -> "SEM DADOS (cinza)"
+                Level.GREEN -> "ACEITAR (borda verde)"
+                Level.YELLOW -> "AVALIAR (borda amarela)"
+                Level.RED -> "RECUSAR (borda vermelha)"
+                Level.NONE -> "SEM DADOS (borda cinza)"
             }
         ).append("\n\n")
-        v.rsPerKm?.let { sb.append("R$/km: ").append("%.2f".format(it).replace(".", ",")).append("\n") }
-        v.rsPerHour?.let { sb.append("R$/hora: ").append("%.2f".format(it).replace(".", ",")).append("\n") }
+
+        v.rsPerKm?.let {
+            sb.append("R$/km: ").append("%.2f".format(it).replace(".", ","))
+                .append("  (sua meta: ").append(dec(cfg.minRsPerKm)).append(")\n")
+        }
+        v.rsPerHour?.let {
+            sb.append("R$/hora: ").append("%.2f".format(it).replace(".", ","))
+                .append("  (sua meta: ").append(dec(cfg.minRsPerHour)).append(")\n")
+        }
         v.fuelCost?.let { sb.append("Combustível: ").append(OfferEvaluator.fmt(it)).append("\n") }
-        v.profitPct?.let { sb.append("Lucro: ").append("%.0f".format(it)).append("%\n") }
-        v.netProfit?.let { sb.append("Líquido: ").append(OfferEvaluator.fmt(it)).append("\n") }
+        v.netProfit?.let { sb.append("Líquido: ").append(OfferEvaluator.fmt(it)) }
+        v.profitPct?.let { sb.append("  (").append("%.0f".format(it)).append("%)\n") }
+
         if (v.reasons.isNotEmpty()) sb.append("\n").append(v.reasons.joinToString("\n") { "• $it" })
         if (v.alerts.isNotEmpty()) sb.append("\n\n⚠ ").append(v.alerts.joinToString("\n⚠ "))
 
-        AlertDialog.Builder(this).setTitle("Teste").setMessage(sb.toString())
+        AlertDialog.Builder(this).setTitle("A conta do cartão").setMessage(sb.toString())
             .setPositiveButton("Ok", null).show()
     }
 

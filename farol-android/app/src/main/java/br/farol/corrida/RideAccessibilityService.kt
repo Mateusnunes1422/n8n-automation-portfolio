@@ -4,7 +4,6 @@ import android.accessibilityservice.AccessibilityService
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.PixelFormat
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -15,8 +14,6 @@ import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.widget.TextView
-import androidx.core.content.ContextCompat
 
 /**
  * Le o texto da oferta na tela do app de corrida e mostra o cartao por cima.
@@ -39,8 +36,6 @@ class RideAccessibilityService : AccessibilityService() {
         private const val DEBOUNCE_MS = 250L
         private const val HIDE_AFTER_MS = 2500L
         private const val MAX_NODES = 400
-        private const val CORNER_DP = 18f
-        private const val BORDER_DP = 3f
     }
 
     /**
@@ -133,16 +128,6 @@ class RideAccessibilityService : AccessibilityService() {
 
     private fun dp(v: Float) = v * resources.displayMetrics.density
 
-    private fun colorOf(level: Level) = ContextCompat.getColor(
-        this,
-        when (level) {
-            Level.GREEN -> R.color.lvl_green
-            Level.YELLOW -> R.color.lvl_yellow
-            Level.RED -> R.color.lvl_red
-            Level.NONE -> R.color.lvl_none
-        }
-    )
-
     private fun badgeFor(pkg: String) = when {
         pkg.contains("ubercab") -> "Uber"
         pkg.contains("99") || pkg.contains("taxi") -> "99"
@@ -183,45 +168,8 @@ class RideAccessibilityService : AccessibilityService() {
 
     private fun showOverlay(pkg: String, v: Verdict) {
         val view = ensureOverlay() ?: return
-
-        // Fundo escuro com borda na cor do veredito geral.
-        val bg = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(CORNER_DP)
-            setColor(ContextCompat.getColor(this@RideAccessibilityService, R.color.card_bg))
-            setStroke(dp(BORDER_DP).toInt(), colorOf(v.level))
-        }
-        view.findViewById<View>(R.id.card).background = bg
-
-        view.findViewById<TextView>(R.id.appBadge).text = badgeFor(pkg)
-
-        val km = "%.1f".format(v.totalKm).replace(".", ",")
-        view.findViewById<TextView>(R.id.headline).text = "$km km · ${v.totalMin} min"
-
-        setMetric(view, R.id.kmBar, R.id.kmValue, v.kmLevel,
-            v.rsPerKm?.let { "%.2f".format(it).replace(".", ",") })
-
-        setMetric(view, R.id.hourBar, R.id.hourValue, v.hourLevel,
-            v.rsPerHour?.let { "%.0f".format(it) })
-
-        setMetric(view, R.id.ratingBar, R.id.ratingValue, v.ratingLevel,
-            v.rating?.let { OfferEvaluator.fmtRating(it) })
-
-        setMetric(view, R.id.profitBar, R.id.profitValue, v.profitLevel,
-            v.profitPct?.let { "%.0f".format(it) })
-
-        val alertView = view.findViewById<TextView>(R.id.alert)
-        if (v.alerts.isNotEmpty()) {
-            alertView.visibility = View.VISIBLE
-            alertView.text = "⚠ " + v.alerts.joinToString(" · ")
-        } else alertView.visibility = View.GONE
-
+        CardRenderer.render(view, badgeFor(pkg), v)
         view.visibility = View.VISIBLE
-    }
-
-    private fun setMetric(root: View, barId: Int, valueId: Int, level: Level, text: String?) {
-        root.findViewById<View>(barId).setBackgroundColor(colorOf(level))
-        root.findViewById<TextView>(valueId).text = text ?: "--"
     }
 
     private fun hideOverlay() { overlay?.visibility = View.GONE }
