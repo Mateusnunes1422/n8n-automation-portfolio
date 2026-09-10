@@ -35,6 +35,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var masterCard: View
     private lateinit var masterTitle: TextView
     private lateinit var masterSub: TextView
+    private lateinit var dayFare: TextView
+    private lateinit var dayKm: TextView
+    private lateinit var dayCount: TextView
+    private lateinit var dayAvg: TextView
     private var previewLevel = Level.GREEN
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,6 +63,13 @@ class MainActivity : AppCompatActivity() {
         masterCard = findViewById(R.id.masterCard)
         masterTitle = findViewById(R.id.masterTitle)
         masterSub = findViewById(R.id.masterSub)
+        dayFare = findViewById(R.id.dayFare)
+        dayKm = findViewById(R.id.dayKm)
+        dayCount = findViewById(R.id.dayCount)
+        dayAvg = findViewById(R.id.dayAvg)
+
+        findViewById<Button>(R.id.btnDayList).setOnClickListener { showDayList() }
+        findViewById<Button>(R.id.btnDayAdd).setOnClickListener { showAddRide() }
 
         // Estado antes do listener, para o primeiro desenho nao gravar de volta.
         masterSwitch.isChecked = Settings.isEnabled(this)
@@ -109,6 +120,7 @@ class MainActivity : AppCompatActivity() {
         if (masterSwitch.isChecked != ligado) masterSwitch.isChecked = ligado
         refreshMaster()
         refreshStatus()
+        refreshDay()
     }
 
     /** Estado do interruptor principal: titulo, explicacao e borda do cartao. */
@@ -122,6 +134,114 @@ class MainActivity : AppCompatActivity() {
         masterCard.setBackgroundResource(
             if (on) R.drawable.bg_surface_on else R.drawable.bg_surface
         )
+    }
+
+    // ---------------- Resumo do dia ----------------
+
+    private fun refreshDay() {
+        RideLog.pruneOlderThan(this)
+        val t = RideLog.totals(RideLog.ridesOn(this))
+
+        dayFare.text = "R$ %.0f".format(t.fare)
+        dayKm.text = "%.0f km".format(t.km)
+        dayCount.text = t.count.toString()
+
+        dayAvg.text = when {
+            t.count == 0 ->
+                "Nenhuma corrida registrada ainda. O Farol conta as ofertas que ele " +
+                    "deduziu que você aceitou — confira e corrija em “Ver o dia”."
+            else -> buildString {
+                t.perKm?.let { append("Média de ").append("R$ %.2f".format(it).replace(".", ",")).append("/km") }
+                t.perHour?.let {
+                    if (isNotEmpty()) append(" · ")
+                    append("R$ %.0f".format(it)).append("/h")
+                }
+                append(" · ").append(t.minutes).append(" min em viagem")
+            }
+        }
+    }
+
+    /** Lista as corridas do dia e permite tirar da conta o que estiver errado. */
+    private fun showDayList() {
+        val rides = RideLog.ridesOn(this)
+        if (rides.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Hoje")
+                .setMessage(
+                    "Nada registrado ainda.\n\n" +
+                        "O Farol não vê o seu extrato: ele só lê as ofertas. Quando deduz " +
+                        "que você aceitou uma, soma aqui pelo valor que a oferta anunciava.\n\n" +
+                        "Se ele errar — somar o que você recusou, ou deixar de somar o que " +
+                        "aceitou — use “Lançar à mão” e este menu para corrigir."
+                )
+                .setPositiveButton("Ok", null)
+                .show()
+            return
+        }
+
+        val fmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+        val itens = rides.map { r ->
+            val hora = java.time.Instant.ofEpochMilli(r.at)
+                .atZone(java.time.ZoneId.systemDefault()).toLocalTime().format(fmt)
+            val marca = if (r.auto) "" else "  (à mão)"
+            "$hora   ${OfferEvaluator.fmt(r.fare)}   ${"%.1f".format(r.km).replace(".", ",")} km$marca"
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("Hoje — toque para remover")
+            .setItems(itens) { _, i -> confirmRemove(i, itens[i]) }
+            .setNegativeButton("Fechar", null)
+            .setNeutralButton("Zerar o dia") { _, _ -> confirmClearDay() }
+            .show()
+    }
+
+    private fun confirmRemove(index: Int, label: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Tirar da conta?")
+            .setMessage(label)
+            .setPositiveButton("Tirar") { _, _ ->
+                RideLog.removeAt(this, index)
+                refreshDay()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun confirmClearDay() {
+        AlertDialog.Builder(this)
+            .setTitle("Zerar o dia?")
+            .setMessage("Apaga todas as corridas registradas hoje. Não dá para desfazer.")
+            .setPositiveButton("Zerar") { _, _ ->
+                RideLog.clear(this)
+                refreshDay()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun showAddRide() {
+        val view = layoutInflater.inflate(R.layout.dialog_add_ride, null)
+        val fare = view.findViewById<EditText>(R.id.addFare)
+        val km = view.findViewById<EditText>(R.id.addKm)
+        val min = view.findViewById<EditText>(R.id.addMin)
+
+        AlertDialog.Builder(this)
+            .setTitle("Lançar corrida")
+            .setView(view)
+            .setPositiveButton("Somar") { _, _ ->
+                val v = num(fare) ?: 0.0
+                val k = num(km) ?: 0.0
+                val m = num(min)?.toInt() ?: 0
+                if (v > 0 || k > 0) {
+                    RideLog.add(
+                        this,
+                        Ride(System.currentTimeMillis(), v, k, m, auto = false)
+                    )
+                    refreshDay()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun loadIntoFields() {

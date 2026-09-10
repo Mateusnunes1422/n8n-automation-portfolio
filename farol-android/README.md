@@ -85,6 +85,32 @@ computador.
 > cada atualização, refazendo toda a liberação de acessibilidade. Ela não é chave
 > de publicação em loja e não protege nada sigiloso.
 
+## 📊 Total do dia
+
+O cartão **Hoje**, no alto da tela, soma o que você ganhou, quantos km rodou e
+quantas corridas fez.
+
+**Como ele sabe:** o Farol não vê o seu extrato — ele só lê as ofertas na tela.
+Quando uma oferta some e a tela seguinte mostra sinais de viagem em andamento
+("A caminho", "Iniciar viagem", "Finalizar viagem"), ele deduz que você aceitou
+e soma pelo valor que a oferta anunciava.
+
+**O que isso implica, e importa:**
+
+- É **dedução, não extrato**. Se o Uber ou a 99 usarem outras palavras nessas
+  telas, corridas aceitas podem não ser contadas — ou o contrário.
+- O valor é o **da oferta**, não o que caiu na conta. Gorjeta, ajuste de tarifa,
+  cancelamento e taxa de espera não aparecem.
+- Os km são os **da oferta** (até o passageiro + viagem). O que você roda entre
+  corridas, procurando, não entra.
+
+Por isso tudo é corrigível: **Ver o dia** lista as corridas e deixa remover o que
+estiver errado ou zerar o dia, e **Lançar à mão** soma uma corrida que ele perdeu.
+Corridas lançadas por você aparecem marcadas com "(à mão)".
+
+Para conferir pagamento, o número que vale é sempre o do app de corrida.
+Os registros ficam no aparelho por 30 dias e depois são apagados sozinhos.
+
 ## 🔌 Ligando e desligando
 
 O interruptor no topo da tela liga e desliga o Farol na hora — desligado, nenhum
@@ -135,6 +161,7 @@ padrões em `OfferParser.kt`.
 | `Settings.kt` | Suas metas, guardadas no aparelho |
 | `CardRenderer.kt` | Desenha o cartão — usado pela sobreposição e pela prévia |
 | `MainActivity.kt` | Tela de configuração e prévia |
+| `RideLog.kt` | Registro do dia e dedução de quais ofertas viraram viagem |
 | `FarolTileService.kt` | Atalho de liga/desliga na aba de notificações |
 
 A leitura é feita com dois cuidados de performance: as mudanças de tela são

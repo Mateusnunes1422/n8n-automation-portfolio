@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="8dp">
+
+    <TextView style="@style/FarolLabel" android:layout_marginTop="0dp" android:text="Valor recebido (R$)" />
+    <EditText android:id="@+id/addFare" style="@style/FarolInput" android:inputType="numberDecimal" android:autofillHints="" android:hint="0,00" />
+
+    <TextView style="@style/FarolLabel" android:text="Distância (km)" />
+    <EditText android:id="@+id/addKm" style="@style/FarolInput" android:inputType="numberDecimal" android:autofillHints="" android:hint="0,0" />
+
+    <TextView style="@style/FarolLabel" android:text="Tempo (minutos)" />
+    <EditText android:id="@+id/addMin" style="@style/FarolInput" android:inputType="number" android:autofillHints="" android:hint="0" />
+</LinearLayout>

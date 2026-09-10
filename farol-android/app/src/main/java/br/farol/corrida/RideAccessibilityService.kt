@@ -37,12 +37,22 @@ class RideAccessibilityService : AccessibilityService() {
     private var pendingScan: Runnable? = null
     private var autoHide: Runnable? = null
 
+    // Ultima oferta mostrada, aguardando para saber se virou viagem.
+    private var pending: Offer? = null
+    private var pendingAt = 0L
+
     companion object {
         private const val DEBOUNCE_MS = 250L
         private const val HIDE_AFTER_MS = 2500L
 
         /** O cartao se apaga sozinho depois disso, mesmo com a oferta na tela. */
         private const val AUTO_HIDE_MS = 5_000L
+
+        /**
+         * Janela para decidir se a oferta virou viagem. Passou disso sem sinal
+         * de viagem na tela, tratamos como recusada e esquecemos.
+         */
+        private const val ACCEPT_WINDOW_MS = 90_000L
         private const val MAX_NODES = 400
     }
 
@@ -110,6 +120,8 @@ class RideAccessibilityService : AccessibilityService() {
         val now = System.currentTimeMillis()
 
         if (!offer.isUsable) {
+            // A oferta saiu da tela. O que aparece agora diz se ela virou viagem.
+            resolvePending(texts, now)
             if (now - lastSeenAt > HIDE_AFTER_MS) {
                 hideOverlay()
                 lastSignature = null
@@ -121,7 +133,41 @@ class RideAccessibilityService : AccessibilityService() {
         if (offer.signature == lastSignature) return   // mesma oferta, ja mostrada
         lastSignature = offer.signature
 
+        // Uma oferta nova apareceu antes de a anterior virar viagem: a anterior
+        // nao foi aceita.
+        pending = offer
+        pendingAt = now
+
         showOverlay(pkg, OfferEvaluator.evaluate(offer, cfg))
+    }
+
+    /**
+     * Decide o destino da oferta que acabou de sair da tela. Nao ha como saber
+     * ao certo se o motorista aceitou — o Farol le a oferta, nunca o extrato —
+     * entao isso e deducao pelos textos da tela seguinte, e o total do dia fica
+     * corrigivel a mao.
+     */
+    private fun resolvePending(texts: List<String>, now: Long) {
+        val offer = pending ?: return
+
+        if (now - pendingAt > ACCEPT_WINDOW_MS) {
+            pending = null
+            return
+        }
+        if (!RideLog.looksAccepted(texts)) return
+
+        val v = OfferEvaluator.evaluate(offer, cfg)
+        RideLog.add(
+            this,
+            Ride(
+                at = now,
+                fare = offer.fare ?: 0.0,
+                km = v.totalKm,
+                minutes = v.totalMin,
+                auto = true
+            )
+        )
+        pending = null
     }
 
     /** Percorre a arvore de nos juntando todo texto visivel. */
